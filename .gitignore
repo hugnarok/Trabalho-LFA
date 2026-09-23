@@ -1,0 +1,19 @@
+# Binário do programa
+lfa
+*.o
+*.out
+*.exe
+
+# Símbolos de debug (macOS)
+*.dSYM/
+
+# Arquivos do sistema / editor
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+
+# Artefatos de exportação locais (opcional)
+saida*.json
+export*.json

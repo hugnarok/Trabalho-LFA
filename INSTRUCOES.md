@@ -252,7 +252,7 @@ Semana 3 (até 19/11)
 
 ## 7. Linguagem
 
-O professor listou **bônus** se o trabalho for nessas linguagens:
+**Decisão do grupo: C (`-std=c11`).** Bônus de +2 do professor.
 
 | Linguagem | Pontos extras |
 |---|---|
@@ -262,15 +262,13 @@ O professor listou **bônus** se o trabalho for nessas linguagens:
 | Pascal | 2 |
 | Fortran | 2 |
 
-Sugestão prática: **Python** ou **C** para entregar no prazo com as 10 funções corretas. Bônus só vale a pena se alguém do grupo já tiver fluência — não troquem a linguagem no meio do caminho.
-
-O grupo precisa **escolher uma linguagem no primeiro encontro** e manter o mesmo tipo de dados.
+A base do projeto já está em `lib/` (headers) e `src/` (implementação), com o tipo `Automato`, JSON, menu e stubs das funções.
 
 ---
 
 ## 8. Casos de teste mínimos (todo mundo usa os mesmos)
 
-Criar a pasta `exemplos/` com pelo menos:
+Criar a pasta `data/` com pelo menos:
 
 1. `afd_simples.json` — AFD que aceita palavras que terminam com `b`.
 2. `afn_lambda.json` — AFN-λ com pelo menos uma transição `&`.
