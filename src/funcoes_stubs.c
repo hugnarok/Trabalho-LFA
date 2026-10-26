@@ -10,27 +10,6 @@ static bool nao_implementado(const char *nome, char *erro, int erro_tam) {
     return false;
 }
 
-bool afn_multi_para_afn_lambda(const Automato *entrada, Automato *saida,
-                               char *erro, int erro_tam) {
-    (void)entrada;
-    (void)saida;
-    return nao_implementado("AFN multi → AFN-λ", erro, erro_tam);
-}
-
-bool afn_lambda_para_afn(const Automato *entrada, Automato *saida, char *erro,
-                         int erro_tam) {
-    (void)entrada;
-    (void)saida;
-    return nao_implementado("AFN-λ → AFN", erro, erro_tam);
-}
-
-bool afn_para_afd(const Automato *entrada, Automato *saida, char *erro,
-                  int erro_tam) {
-    (void)entrada;
-    (void)saida;
-    return nao_implementado("AFN → AFD", erro, erro_tam);
-}
-
 bool minimizar_afd(const Automato *entrada, Automato *saida, char *erro,
                    int erro_tam) {
     (void)entrada;
