@@ -5,8 +5,6 @@
 
 #include <stdbool.h>
 
-/* Carrega automato1 (obrigatório) e automato2 (opcional).
- * Retorna true em sucesso. Se não houver automato2, af2_presente = false. */
 bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
                    bool *af2_presente, char *erro, int erro_tam);
 
