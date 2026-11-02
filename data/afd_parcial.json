@@ -1,0 +1,11 @@
+{
+  "automato1": {
+    "alfabeto": ["a"],
+    "estados": ["q0", "q1"],
+    "estados_finais": ["q1"],
+    "estado_inicial": "q0",
+    "transicoes": [
+      ["q0", "q1", "a"]
+    ]
+  }
+}
