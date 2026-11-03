@@ -25,9 +25,12 @@ lib/                        # headers (.h)
 src/                        # implementação (.c)
   automato.c
   json_io.c
+  operacoes.c               # união, interseção, subtração e complemento
   funcoes_stubs.c           # stubs (cada um substitui a sua parte)
   main.c                    # menu + AF1 / AF2 / AF Resultado
 data/                       # JSONs e palavras de teste
+docs/
+  docs_operacoes.md           # explicação das operações de união, subtração, complemento e interseção
 INSTRUCOES.md               # enunciado e divisão do grupo
 ```
 
@@ -46,7 +49,7 @@ Assinaturas em `lib/funcoes.h`. Ninguém inventa outro formato de autômato.
 
 | Papel | Nome |
 |---|---|
-| 1 | |
-| 2 | |
-| 3 | |
-| 4 | |
+| 1 | Hugo Henrique Marques |
+| 2 | Ahmed Amer Hachem |
+| 3 | Deivy Rossi Teixeira de Melo |
+| 4 | Arthur Batista Lage e Silva |
