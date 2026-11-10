@@ -202,12 +202,12 @@ static bool ler_objeto_automato(const char **p, Automato *af) {
                                    MAX_ESTADOS)) {
                 return false;
             }
-        } else if (chave_igual(chave, "estados_finais", "estados finais")) {
+        } else if (chave_igual(chave, "estados-finais", "estados_finais")) {
             if (!ler_array_estados(p, af->estados_finais, &af->n_finais,
                                    MAX_ESTADOS)) {
                 return false;
             }
-        } else if (chave_igual(chave, "estado_inicial", "estado inicial")) {
+        } else if (chave_igual(chave, "estado-inicial", "estado_inicial")) {
             if (!ler_string(p, af->estado_inicial, MAX_NOME)) {
                 return false;
             }
@@ -369,14 +369,14 @@ static void escrever_af(FILE *f, const Automato *af, const char *nome,
     }
     fprintf(f, "],\n");
 
-    fprintf(f, "%*s\"estados_finais\": [", indent + 2, "");
+    fprintf(f, "%*s\"estados-finais\": [", indent + 2, "");
     for (int i = 0; i < af->n_finais; i++) {
         fprintf(f, "\"%s\"%s", af->estados_finais[i],
                 i + 1 < af->n_finais ? ", " : "");
     }
     fprintf(f, "],\n");
 
-    fprintf(f, "%*s\"estado_inicial\": \"%s\",\n", indent + 2, "",
+    fprintf(f, "%*s\"estado-inicial\": \"%s\",\n", indent + 2, "",
             af->estado_inicial);
 
     fprintf(f, "%*s\"transicoes\": [\n", indent + 2, "");

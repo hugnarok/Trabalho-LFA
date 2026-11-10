@@ -29,8 +29,8 @@ O professor passou o formato abaixo. `automato2` é **opcional**.
   "automato1": {
     "alfabeto": ["a", "b"],
     "estados": ["q0", "q1", "q2"],
-    "estados_finais": ["q2"],
-    "estado_inicial": "q0",
+    "estados-finais": ["q2"],
+    "estado-inicial": "q0",
     "transicoes": [
       ["q0", "q0", "a"],
       ["q0", "q0", "b"],
@@ -42,8 +42,8 @@ O professor passou o formato abaixo. `automato2` é **opcional**.
   "automato2": {
     "alfabeto": ["a", "b"],
     "estados": ["p0", "p1"],
-    "estados_finais": ["p1"],
-    "estado_inicial": "p0",
+    "estados-finais": ["p1"],
+    "estado-inicial": "p0",
     "transicoes": [
       ["p0", "p1", "a"],
       ["p1", "p1", "b"]
@@ -58,15 +58,15 @@ O professor passou o formato abaixo. `automato2` é **opcional**.
 |---|---|
 | `alfabeto` | Símbolos da linguagem (sem `&`) |
 | `estados` | Nomes dos estados |
-| `estados_finais` | Subconjunto de `estados` |
-| `estado_inicial` | Um único estado |
+| `estados-finais` | Subconjunto de `estados` |
+| `estado-inicial` | Um único estado |
 | `transicoes` | Lista de triplas `[origem, destino, simbolo]` |
 | `&` | Transição lambda / épsilon (`λ`) |
 
 **AFN:** o mesmo par `(origem, simbolo)` pode ter vários destinos.  
 **AFD:** cada par `(origem, simbolo do alfabeto)` tem no máximo um destino, e não há `&`.
 
-> Se o professor usou chaves com espaço (`"estados finais"`, `"estado inicial"`), o leitor deve aceitar as duas formas.
+> O formato oficial usa hífen (`"estados-finais"`, `"estado-inicial"`). O leitor ainda aceita a forma antiga com underscore por compatibilidade.
 
 ---
 
