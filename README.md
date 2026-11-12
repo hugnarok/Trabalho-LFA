@@ -13,7 +13,7 @@ make
 ./lfa
 ```
 
-No menu, use a opção **1** e digite o **número** do autômato da lista (os caminhos já estão salvos). Use `0` só se quiser informar outro caminho.
+No menu, use a opção **1** (Carregar JSON): escolha o **destino** (AF1, AF2 ou AF Resultado). Na lista de origem, use **9** para copiar o **AF Resultado** (ou **7**/**8** para AF1/AF2) já em memória — útil após uma conversão sem exportar JSON. Para arquivo, escolha um exemplo ou `0` e depois o bloco (`automato1`, `automato2` ou `resultado`).
 
 ## Estrutura
 

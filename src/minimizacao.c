@@ -18,6 +18,15 @@ static int destino_da_transicao(const Automato *af, int estado, char simbolo) {
 }
 
 bool minimizar_afd(const Automato *entrada, Automato *saida, char *erro, int erro_tam) {
+    if (entrada == NULL || saida == NULL) {
+        snprintf(erro, erro_tam, "parâmetro inválido em minimizar_afd");
+        return false;
+    }
+    if (saida == entrada) {
+        snprintf(erro, erro_tam,
+                 "o autômato de saída deve ser diferente da entrada");
+        return false;
+    }
     if (!automato_validar(entrada, erro, erro_tam)) {
         return false;
     }
@@ -194,12 +203,23 @@ bool minimizar_afd(const Automato *entrada, Automato *saida, char *erro, int err
                 continue;
             }
 
+            if (saida->n_transicoes >= MAX_TRANSICOES) {
+                snprintf(erro, erro_tam,
+                         "minimização excede o limite de %d transições",
+                         MAX_TRANSICOES);
+                return false;
+            }
+
             Transicao nova;
             snprintf(nova.origem, MAX_NOME, "M%d", c);
             snprintf(nova.destino, MAX_NOME, "M%d", classe[destino]);
             nova.simbolo = entrada->alfabeto[simbolo];
             saida->transicoes[saida->n_transicoes++] = nova;
         }
+    }
+
+    if (!automato_validar(saida, erro, erro_tam)) {
+        return false;
     }
 
     return true;

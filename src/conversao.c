@@ -76,13 +76,14 @@ static void gerar_nome_auxiliar(const Automato *af, const char *origem,
     }
 
     int sufixo = 1;
-    while (1) {
+    while (sufixo < 100000) {
         snprintf(nome_out, (size_t)tam, "%s_%c_%d", origem, simbolo, sufixo);
         if (automato_indice_estado(af, nome_out) < 0) {
             return;
         }
         sufixo++;
     }
+    snprintf(nome_out, (size_t)tam, "__aux_%c_%d", simbolo, sufixo);
 }
 
 /* =========================================================================

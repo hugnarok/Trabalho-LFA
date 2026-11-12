@@ -172,9 +172,17 @@ static bool ler_array_transicoes(const char **p, Automato *af) {
     }
 }
 
-static bool ler_objeto_automato(const char **p, Automato *af) {
+static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
+                                char *erro, int erro_tam) {
+    bool tem_alfabeto = false;
+    bool tem_estados = false;
+    bool tem_finais = false;
+    bool tem_inicial = false;
+    bool tem_transicoes = false;
+
     automato_init(af);
     if (!consumir(p, '{')) {
+        snprintf(erro, erro_tam, "%s: esperado '{'", ctx);
         return false;
     }
 
@@ -187,35 +195,78 @@ static bool ler_objeto_automato(const char **p, Automato *af) {
     while (1) {
         char chave[MAX_NOME];
         if (!ler_string(p, chave, sizeof(chave))) {
+            snprintf(erro, erro_tam, "%s: chave de campo esperada", ctx);
             return false;
         }
         if (!consumir(p, ':')) {
+            snprintf(erro, erro_tam, "%s: esperado ':' após '%s'", ctx, chave);
             return false;
         }
 
         if (chave_igual(chave, "alfabeto", NULL)) {
+            if (tem_alfabeto) {
+                snprintf(erro, erro_tam, "%s: campo 'alfabeto' duplicado", ctx);
+                return false;
+            }
+            tem_alfabeto = true;
             if (!ler_array_simbolos(p, af)) {
+                snprintf(erro, erro_tam,
+                         "%s: 'alfabeto' inválido (use um caractere por "
+                         "símbolo)",
+                         ctx);
                 return false;
             }
         } else if (chave_igual(chave, "estados", NULL)) {
+            if (tem_estados) {
+                snprintf(erro, erro_tam, "%s: campo 'estados' duplicado", ctx);
+                return false;
+            }
+            tem_estados = true;
             if (!ler_array_estados(p, af->estados, &af->n_estados,
                                    MAX_ESTADOS)) {
+                snprintf(erro, erro_tam,
+                         "%s: 'estados' inválido ou excede %d estados", ctx,
+                         MAX_ESTADOS);
                 return false;
             }
         } else if (chave_igual(chave, "estados-finais", "estados_finais")) {
+            if (tem_finais) {
+                snprintf(erro, erro_tam,
+                         "%s: campo 'estados-finais' duplicado", ctx);
+                return false;
+            }
+            tem_finais = true;
             if (!ler_array_estados(p, af->estados_finais, &af->n_finais,
                                    MAX_ESTADOS)) {
+                snprintf(erro, erro_tam, "%s: 'estados-finais' inválido", ctx);
                 return false;
             }
         } else if (chave_igual(chave, "estado-inicial", "estado_inicial")) {
+            if (tem_inicial) {
+                snprintf(erro, erro_tam,
+                         "%s: campo 'estado-inicial' duplicado", ctx);
+                return false;
+            }
+            tem_inicial = true;
             if (!ler_string(p, af->estado_inicial, MAX_NOME)) {
+                snprintf(erro, erro_tam, "%s: 'estado-inicial' inválido", ctx);
                 return false;
             }
         } else if (chave_igual(chave, "transicoes", "transições")) {
+            if (tem_transicoes) {
+                snprintf(erro, erro_tam,
+                         "%s: campo 'transicoes' duplicado", ctx);
+                return false;
+            }
+            tem_transicoes = true;
             if (!ler_array_transicoes(p, af)) {
+                snprintf(erro, erro_tam,
+                         "%s: 'transicoes' inválida ou excede %d entradas", ctx,
+                         MAX_TRANSICOES);
                 return false;
             }
         } else {
+            snprintf(erro, erro_tam, "%s: campo desconhecido '%s'", ctx, chave);
             return false;
         }
 
@@ -228,6 +279,7 @@ static bool ler_objeto_automato(const char **p, Automato *af) {
             (*p)++;
             return true;
         }
+        snprintf(erro, erro_tam, "%s: JSON malformado no objeto", ctx);
         return false;
     }
 }
@@ -250,6 +302,11 @@ static char *ler_arquivo_inteiro(const char *caminho, char *erro, int erro_tam) 
         snprintf(erro, erro_tam, "erro ao ler '%s'", caminho);
         return NULL;
     }
+    if (tam > 10L * 1024L * 1024L) {
+        fclose(f);
+        snprintf(erro, erro_tam, "arquivo JSON muito grande (máx. 10 MiB)");
+        return NULL;
+    }
     rewind(f);
 
     char *buf = malloc((size_t)tam + 1);
@@ -261,15 +318,27 @@ static char *ler_arquivo_inteiro(const char *caminho, char *erro, int erro_tam) 
 
     size_t lidos = fread(buf, 1, (size_t)tam, f);
     fclose(f);
+    if (lidos != (size_t)tam) {
+        free(buf);
+        snprintf(erro, erro_tam, "leitura incompleta de '%s'", caminho);
+        return NULL;
+    }
     buf[lidos] = '\0';
     return buf;
 }
 
 bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
-                   bool *af2_presente, char *erro, int erro_tam) {
+                   bool *af2_presente, Automato *af_resultado,
+                   bool *resultado_presente, char *erro, int erro_tam) {
     *af2_presente = false;
+    if (resultado_presente != NULL) {
+        *resultado_presente = false;
+    }
     automato_init(af1);
     automato_init(af2);
+    if (af_resultado != NULL) {
+        automato_init(af_resultado);
+    }
 
     char *buf = ler_arquivo_inteiro(caminho, erro, erro_tam);
     if (!buf) {
@@ -279,6 +348,9 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
     const char *p = buf;
     bool ok = false;
     bool tem_af1 = false;
+    bool chave_af1 = false;
+    bool chave_af2 = false;
+    bool chave_resultado = false;
 
     if (!consumir(&p, '{')) {
         snprintf(erro, erro_tam, "JSON inválido: esperado '{'");
@@ -303,17 +375,41 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
         }
 
         if (strcmp(chave, "automato1") == 0) {
-            if (!ler_objeto_automato(&p, af1)) {
-                snprintf(erro, erro_tam, "falha ao ler automato1");
+            if (chave_af1) {
+                snprintf(erro, erro_tam, "chave 'automato1' duplicada");
+                goto fim;
+            }
+            chave_af1 = true;
+            if (!ler_objeto_automato(&p, af1, "automato1", erro, erro_tam)) {
                 goto fim;
             }
             tem_af1 = true;
         } else if (strcmp(chave, "automato2") == 0) {
-            if (!ler_objeto_automato(&p, af2)) {
-                snprintf(erro, erro_tam, "falha ao ler automato2");
+            if (chave_af2) {
+                snprintf(erro, erro_tam, "chave 'automato2' duplicada");
+                goto fim;
+            }
+            chave_af2 = true;
+            if (!ler_objeto_automato(&p, af2, "automato2", erro, erro_tam)) {
                 goto fim;
             }
             *af2_presente = true;
+        } else if (strcmp(chave, "resultado") == 0) {
+            if (af_resultado == NULL || resultado_presente == NULL) {
+                snprintf(erro, erro_tam,
+                         "chave 'resultado' não suportada nesta carga");
+                goto fim;
+            }
+            if (chave_resultado) {
+                snprintf(erro, erro_tam, "chave 'resultado' duplicada");
+                goto fim;
+            }
+            chave_resultado = true;
+            if (!ler_objeto_automato(&p, af_resultado, "resultado", erro,
+                                     erro_tam)) {
+                goto fim;
+            }
+            *resultado_presente = true;
         } else {
             snprintf(erro, erro_tam, "chave desconhecida '%s'", chave);
             goto fim;
@@ -337,11 +433,26 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
         goto fim;
     }
 
-    if (!automato_validar(af1, erro, erro_tam)) {
-        goto fim;
+    {
+        char msg[256];
+        if (!automato_validar(af1, msg, sizeof(msg))) {
+            snprintf(erro, erro_tam, "automato1: %s", msg);
+            goto fim;
+        }
     }
-    if (*af2_presente && !automato_validar(af2, erro, erro_tam)) {
-        goto fim;
+    if (*af2_presente) {
+        char msg[256];
+        if (!automato_validar(af2, msg, sizeof(msg))) {
+            snprintf(erro, erro_tam, "automato2: %s", msg);
+            goto fim;
+        }
+    }
+    if (resultado_presente != NULL && *resultado_presente) {
+        char msg[256];
+        if (!automato_validar(af_resultado, msg, sizeof(msg))) {
+            snprintf(erro, erro_tam, "resultado: %s", msg);
+            goto fim;
+        }
     }
 
     ok = true;
@@ -351,9 +462,30 @@ fim:
     return ok;
 }
 
+static void fprint_string_json(FILE *f, const char *s) {
+    fputc('"', f);
+    if (s != NULL) {
+        for (const char *p = s; *p != '\0'; p++) {
+            unsigned char c = (unsigned char)*p;
+            if (c == '"' || c == '\\') {
+                fputc('\\', f);
+                fputc((char)c, f);
+            } else if (c == '\n') {
+                fputs("\\n", f);
+            } else {
+                fputc((char)c, f);
+            }
+        }
+    }
+    fputc('"', f);
+}
+
 static void escrever_af(FILE *f, const Automato *af, const char *nome,
                         int indent) {
-    fprintf(f, "%*s\"%s\": {\n", indent, "", nome);
+    fprintf(f, "%*s", indent, "");
+    fputc('"', f);
+    fputs(nome, f);
+    fputs("\": {\n", f);
 
     fprintf(f, "%*s\"alfabeto\": [", indent + 2, "");
     for (int i = 0; i < af->n_alfabeto; i++) {
@@ -364,26 +496,34 @@ static void escrever_af(FILE *f, const Automato *af, const char *nome,
 
     fprintf(f, "%*s\"estados\": [", indent + 2, "");
     for (int i = 0; i < af->n_estados; i++) {
-        fprintf(f, "\"%s\"%s", af->estados[i],
-                i + 1 < af->n_estados ? ", " : "");
+        if (i > 0) {
+            fputs(", ", f);
+        }
+        fprint_string_json(f, af->estados[i]);
     }
     fprintf(f, "],\n");
 
     fprintf(f, "%*s\"estados-finais\": [", indent + 2, "");
     for (int i = 0; i < af->n_finais; i++) {
-        fprintf(f, "\"%s\"%s", af->estados_finais[i],
-                i + 1 < af->n_finais ? ", " : "");
+        if (i > 0) {
+            fputs(", ", f);
+        }
+        fprint_string_json(f, af->estados_finais[i]);
     }
     fprintf(f, "],\n");
 
-    fprintf(f, "%*s\"estado-inicial\": \"%s\",\n", indent + 2, "",
-            af->estado_inicial);
+    fprintf(f, "%*s\"estado-inicial\": ", indent + 2, "");
+    fprint_string_json(f, af->estado_inicial);
+    fputs(",\n", f);
 
     fprintf(f, "%*s\"transicoes\": [\n", indent + 2, "");
     for (int i = 0; i < af->n_transicoes; i++) {
         const Transicao *t = &af->transicoes[i];
-        fprintf(f, "%*s[\"%s\", \"%s\", \"%c\"]%s\n", indent + 4, "",
-                t->origem, t->destino, t->simbolo,
+        fprintf(f, "%*s[", indent + 4, "");
+        fprint_string_json(f, t->origem);
+        fputs(", ", f);
+        fprint_string_json(f, t->destino);
+        fprintf(f, ", \"%c\"]%s\n", t->simbolo,
                 i + 1 < af->n_transicoes ? "," : "");
     }
     fprintf(f, "%*s]\n", indent + 2, "");

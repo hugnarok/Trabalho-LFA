@@ -18,15 +18,48 @@ static void limpar_entrada(void) {
     }
 }
 
-static void ler_linha(char *buf, int tam) {
+static void remover_cr(char *buf) {
+    size_t n = strlen(buf);
+    if (n > 0 && buf[n - 1] == '\r') {
+        buf[n - 1] = '\0';
+    }
+}
+
+static bool ler_linha(char *buf, int tam) {
     if (!fgets(buf, tam, stdin)) {
         buf[0] = '\0';
-        return;
+        return false;
     }
     size_t n = strlen(buf);
+    bool linha_cheia = (n == (size_t)(tam - 1) && buf[n - 1] != '\n');
     if (n > 0 && buf[n - 1] == '\n') {
         buf[n - 1] = '\0';
     }
+    remover_cr(buf);
+    if (linha_cheia) {
+        int c;
+        bool resto = false;
+        while ((c = getchar()) != '\n' && c != EOF) {
+            resto = true;
+        }
+        if (resto) {
+            printf("Aviso: linha truncada (máx. %d caracteres).\n", tam - 1);
+        }
+    }
+    return true;
+}
+
+static bool palavra_vazia_especial(const char *s) {
+    return strcmp(s, "ε") == 0 || strcmp(s, "<vazio>") == 0 ||
+           strcmp(s, "<epsilon>") == 0 || strcmp(s, "<e>") == 0;
+}
+
+static void copiar_palavra_teste(const char *entrada, char *palavra, int tam) {
+    if (palavra_vazia_especial(entrada)) {
+        palavra[0] = '\0';
+        return;
+    }
+    snprintf(palavra, (size_t)tam, "%s", entrada);
 }
 
 static void mostrar_menu(void) {
@@ -36,7 +69,7 @@ static void mostrar_menu(void) {
            tem_af2 ? "carregado" : "vazio",
            tem_resultado ? "carregado" : "vazio");
     printf("----------------------------------------------\n");
-    printf(" 1) Carregar JSON\n");
+    printf(" 1) Carregar JSON (AF1 / AF2)\n");
     printf(" 2) Converter AFN múltiplo-estado → AFN-λ\n");
     printf(" 3) Converter AFN-λ → AFN\n");
     printf(" 4) Converter AFN → AFD\n");
@@ -69,6 +102,66 @@ static bool precisa_dois_afds(void) {
     return true;
 }
 
+static const Automato *escolher_automato_unario(void) {
+    int opcoes = 0;
+    if (tem_af1) {
+        opcoes++;
+    }
+    if (tem_af2) {
+        opcoes++;
+    }
+    if (tem_resultado) {
+        opcoes++;
+    }
+
+    if (opcoes == 0) {
+        printf("Nenhum autômato carregado. Use a opção 1 primeiro.\n");
+        return NULL;
+    }
+    if (opcoes == 1) {
+        if (tem_resultado) {
+            return &af_resultado;
+        }
+        if (tem_af2) {
+            return &af2;
+        }
+        return &af1;
+    }
+
+    printf("\nQual autômato usar?\n");
+    if (tem_af1) {
+        printf(" 1) AF1\n");
+    }
+    if (tem_af2) {
+        printf(" 2) AF2\n");
+    }
+    if (tem_resultado) {
+        printf(" 3) AF Resultado\n");
+    }
+    printf("Número: ");
+
+    int num = -1;
+    if (scanf("%d", &num) != 1) {
+        limpar_entrada();
+        printf("Número inválido.\n");
+        return NULL;
+    }
+    limpar_entrada();
+
+    if (num == 1 && tem_af1) {
+        return &af1;
+    }
+    if (num == 2 && tem_af2) {
+        return &af2;
+    }
+    if (num == 3 && tem_resultado) {
+        return &af_resultado;
+    }
+
+    printf("Opção inválida.\n");
+    return NULL;
+}
+
 typedef struct {
     const char *nome;
     const char *caminho;
@@ -76,20 +169,40 @@ typedef struct {
 
 static const AutomatoExemplo AUTOMATOS_EXEMPLO[] = {
     {"AFD simples", "data/afd_simples.json"},
+    {"AFD parcial (complemento)", "data/afd_parcial.json"},
     {"AFN-λ", "data/afn_lambda.json"},
     {"AFN não determinístico", "data/afn_nao_deterministico.json"},
     {"Dois AFDs (união/interseção)", "data/dois_afds.json"},
+    {"AFDs com alfabetos diferentes", "data/afds_alfabetos_diferentes.json"},
 };
 static const int N_AUTOMATOS_EXEMPLO =
     (int)(sizeof(AUTOMATOS_EXEMPLO) / sizeof(AUTOMATOS_EXEMPLO[0]));
 
-static bool escolher_caminho_json(char *caminho, int tam) {
-    printf("\nAutômatos disponíveis:\n");
+typedef enum {
+    FONTE_ARQUIVO_JSON = 0,
+    FONTE_MEM_AF1 = 1,
+    FONTE_MEM_AF2 = 2,
+    FONTE_MEM_RESULTADO = 3
+} FonteCarregamento;
+
+#define OPC_MEM_AF1 7
+#define OPC_MEM_AF2 8
+#define OPC_MEM_RESULTADO 9
+
+static bool escolher_fonte_carregamento(FonteCarregamento *fonte, char *caminho,
+                                          int tam) {
+    printf("\nOrigem do autômato:\n");
+    printf("--- Arquivos JSON ---\n");
     for (int i = 0; i < N_AUTOMATOS_EXEMPLO; i++) {
         printf("  %d) %s\n", i + 1, AUTOMATOS_EXEMPLO[i].nome);
     }
     printf("  0) Digitar outro caminho\n");
-    printf("Número do autômato: ");
+    printf("--- Já em memória ---\n");
+    printf("  %d) AF Resultado%s\n", OPC_MEM_RESULTADO,
+           tem_resultado ? "" : " (vazio)");
+    printf("  %d) AF1%s\n", OPC_MEM_AF1, tem_af1 ? "" : " (vazio)");
+    printf("  %d) AF2%s\n", OPC_MEM_AF2, tem_af2 ? "" : " (vazio)");
+    printf("Número: ");
 
     int num = -1;
     if (scanf("%d", &num) != 1) {
@@ -99,62 +212,326 @@ static bool escolher_caminho_json(char *caminho, int tam) {
     }
     limpar_entrada();
 
+    if (num == OPC_MEM_RESULTADO) {
+        if (!tem_resultado) {
+            printf("AF Resultado está vazio. Faça uma conversão/operação "
+                   "antes.\n");
+            return false;
+        }
+        *fonte = FONTE_MEM_RESULTADO;
+        caminho[0] = '\0';
+        return true;
+    }
+    if (num == OPC_MEM_AF1) {
+        if (!tem_af1) {
+            printf("AF1 está vazio.\n");
+            return false;
+        }
+        *fonte = FONTE_MEM_AF1;
+        caminho[0] = '\0';
+        return true;
+    }
+    if (num == OPC_MEM_AF2) {
+        if (!tem_af2) {
+            printf("AF2 está vazio.\n");
+            return false;
+        }
+        *fonte = FONTE_MEM_AF2;
+        caminho[0] = '\0';
+        return true;
+    }
+
     if (num == 0) {
         printf("Caminho do JSON: ");
-        ler_linha(caminho, tam);
-        if (caminho[0] == '\0') {
+        if (!ler_linha(caminho, tam) || caminho[0] == '\0') {
             printf("Caminho vazio.\n");
             return false;
         }
+        *fonte = FONTE_ARQUIVO_JSON;
         return true;
     }
 
     if (num < 1 || num > N_AUTOMATOS_EXEMPLO) {
-        printf("Número fora da lista (1–%d ou 0).\n", N_AUTOMATOS_EXEMPLO);
+        printf("Número fora da lista (1–%d, %d–%d ou 0).\n",
+               N_AUTOMATOS_EXEMPLO, OPC_MEM_AF1, OPC_MEM_RESULTADO);
         return false;
     }
 
     snprintf(caminho, (size_t)tam, "%s", AUTOMATOS_EXEMPLO[num - 1].caminho);
     printf("Selecionado: %s (%s)\n", AUTOMATOS_EXEMPLO[num - 1].nome, caminho);
+    *fonte = FONTE_ARQUIVO_JSON;
+    return true;
+}
+
+static bool copiar_da_memoria(FonteCarregamento fonte, Automato *destino,
+                              char *erro, int erro_tam) {
+    const Automato *origem = NULL;
+    const char *nome = NULL;
+
+    if (fonte == FONTE_MEM_AF1) {
+        origem = &af1;
+        nome = "AF1";
+    } else if (fonte == FONTE_MEM_AF2) {
+        origem = &af2;
+        nome = "AF2";
+    } else if (fonte == FONTE_MEM_RESULTADO) {
+        origem = &af_resultado;
+        nome = "AF Resultado";
+    } else {
+        snprintf(erro, erro_tam, "fonte em memória inválida");
+        return false;
+    }
+
+    if (!automato_validar(origem, erro, erro_tam)) {
+        snprintf(erro, erro_tam, "%s: %s", nome, erro);
+        return false;
+    }
+
+    *destino = *origem;
+    return true;
+}
+
+static bool carregar_do_arquivo(const char *caminho, char *erro, int erro_tam,
+                                Automato *novo1, Automato *novo2,
+                                Automato *novo_res, bool *tem2, bool *tem_res) {
+    return carregar_json(caminho, novo1, novo2, tem2, novo_res, tem_res, erro,
+                         erro_tam);
+}
+
+typedef enum {
+    JSON_BLOCO_AUTOMATO1 = 1,
+    JSON_BLOCO_AUTOMATO2 = 2,
+    JSON_BLOCO_RESULTADO = 3
+} JsonBloco;
+
+static const char *nome_bloco_json(JsonBloco bloco) {
+    switch (bloco) {
+    case JSON_BLOCO_AUTOMATO1:
+        return "automato1";
+    case JSON_BLOCO_AUTOMATO2:
+        return "automato2";
+    case JSON_BLOCO_RESULTADO:
+        return "resultado";
+    default:
+        return "?";
+    }
+}
+
+static bool escolher_bloco_json(bool tem2, bool tem_res, JsonBloco *bloco) {
+    if (!tem2 && !tem_res) {
+        *bloco = JSON_BLOCO_AUTOMATO1;
+        printf("\n(Este JSON só tem automato1 — será usado automaticamente.)\n");
+        return true;
+    }
+
+    printf("\nO arquivo tem várias partes. Qual delas copiar para o slot "
+           "escolhido (AF1/AF2/Resultado)?\n");
+    printf(" 1) automato1 — primeiro autômato do arquivo\n");
+    if (tem2) {
+        printf(" 2) automato2 — segundo autômato (união/interseção etc.)\n");
+    }
+    if (tem_res) {
+        printf(" 3) resultado — autômato exportado após conversão/operação\n");
+    }
+    printf(" 0) Cancelar\n");
+    printf("Escolha: ");
+
+    int op = -1;
+    if (scanf("%d", &op) != 1) {
+        limpar_entrada();
+        printf("Opção inválida.\n");
+        return false;
+    }
+    limpar_entrada();
+
+    if (op == 0) {
+        return false;
+    }
+    if (op == 1) {
+        *bloco = JSON_BLOCO_AUTOMATO1;
+        return true;
+    }
+    if (op == 2) {
+        if (!tem2) {
+            printf("Este arquivo não contém automato2.\n");
+            return false;
+        }
+        *bloco = JSON_BLOCO_AUTOMATO2;
+        return true;
+    }
+    if (op == 3) {
+        if (!tem_res) {
+            printf("Este arquivo não contém resultado.\n");
+            return false;
+        }
+        *bloco = JSON_BLOCO_RESULTADO;
+        return true;
+    }
+
+    printf("Opção inválida.\n");
+    return false;
+}
+
+static bool copiar_bloco_json(const Automato *novo1, const Automato *novo2,
+                              const Automato *novo_res, JsonBloco bloco,
+                              bool tem2, bool tem_res, Automato *destino,
+                              char *erro, int erro_tam) {
+    const Automato *origem = NULL;
+
+    if (bloco == JSON_BLOCO_AUTOMATO1) {
+        origem = novo1;
+    } else if (bloco == JSON_BLOCO_AUTOMATO2) {
+        if (!tem2) {
+            snprintf(erro, erro_tam, "arquivo sem automato2");
+            return false;
+        }
+        origem = novo2;
+    } else if (bloco == JSON_BLOCO_RESULTADO) {
+        if (!tem_res) {
+            snprintf(erro, erro_tam, "arquivo sem resultado");
+            return false;
+        }
+        origem = novo_res;
+    } else {
+        snprintf(erro, erro_tam, "bloco JSON inválido");
+        return false;
+    }
+
+    *destino = *origem;
     return true;
 }
 
 static void acao_carregar(void) {
-    char caminho[512];
-    char erro[256];
+    printf("\n--- Carregar JSON ---\n");
+    printf(" 1) Carregar no AF1\n");
+    printf(" 2) Carregar no AF2\n");
+    printf(" 3) Carregar no AF Resultado\n");
+    printf(" 4) Carregar AF1, AF2 e Resultado do mesmo arquivo (carga "
+           "completa)\n");
+    printf(" 0) Voltar\n");
+    printf("Escolha: ");
 
-    if (!escolher_caminho_json(caminho, sizeof(caminho))) {
+    int slot = -1;
+    if (scanf("%d", &slot) != 1) {
+        limpar_entrada();
+        if (feof(stdin)) {
+            printf("Entrada encerrada.\n");
+        } else {
+            printf("Opção inválida.\n");
+        }
+        return;
+    }
+    limpar_entrada();
+
+    if (slot == 0) {
+        return;
+    }
+    if (slot < 1 || slot > 4) {
+        printf("Opção inválida (use 1–4 ou 0).\n");
         return;
     }
 
-    Automato novo1, novo2;
+    FonteCarregamento fonte;
+    char caminho[512];
+    char erro[256];
+    if (slot == 4) {
+        printf("\nCarga completa: escolha o arquivo JSON.\n");
+        fonte = FONTE_ARQUIVO_JSON;
+        if (!escolher_fonte_carregamento(&fonte, caminho, sizeof(caminho))) {
+            return;
+        }
+        if (fonte != FONTE_ARQUIVO_JSON) {
+            printf("Carga completa só funciona com arquivo JSON.\n");
+            return;
+        }
+    } else if (!escolher_fonte_carregamento(&fonte, caminho, sizeof(caminho))) {
+        return;
+    }
+
+    Automato *destino = NULL;
+    const char *nome_slot = NULL;
+    if (slot == 1) {
+        destino = &af1;
+        nome_slot = "AF1";
+        tem_af1 = true;
+    } else if (slot == 2) {
+        destino = &af2;
+        nome_slot = "AF2";
+        tem_af2 = true;
+    } else if (slot == 3) {
+        destino = &af_resultado;
+        nome_slot = "AF Resultado";
+        tem_resultado = true;
+    }
+
+    if (slot != 4 && fonte != FONTE_ARQUIVO_JSON) {
+        const char *nome_fonte = fonte == FONTE_MEM_AF1      ? "AF1"
+                                 : fonte == FONTE_MEM_AF2    ? "AF2"
+                                                             : "AF Resultado";
+        if (!copiar_da_memoria(fonte, destino, erro, sizeof(erro))) {
+            printf("Erro: %s\n", erro);
+            return;
+        }
+        printf("%s atualizado com cópia de %s (memória).\n", nome_slot,
+               nome_fonte);
+        return;
+    }
+
+    Automato novo1, novo2, novo_res;
     bool tem2 = false;
-    if (!carregar_json(caminho, &novo1, &novo2, &tem2, erro, sizeof(erro))) {
+    bool tem_res = false;
+    if (!carregar_do_arquivo(caminho, erro, sizeof(erro), &novo1, &novo2,
+                             &novo_res, &tem2, &tem_res)) {
         printf("Erro: %s\n", erro);
         return;
     }
 
-    af1 = novo1;
-    tem_af1 = true;
-    if (tem2) {
-        af2 = novo2;
-        tem_af2 = true;
-    } else {
-        automato_init(&af2);
-        tem_af2 = false;
+    if (slot == 4) {
+        af1 = novo1;
+        tem_af1 = true;
+        if (tem2) {
+            af2 = novo2;
+            tem_af2 = true;
+        } else {
+            automato_init(&af2);
+            tem_af2 = false;
+        }
+        if (tem_res) {
+            af_resultado = novo_res;
+            tem_resultado = true;
+        } else {
+            automato_init(&af_resultado);
+            tem_resultado = false;
+        }
+        printf("JSON carregado. AF1 ok%s%s.\n", tem_af2 ? ", AF2 ok" : "",
+               tem_res ? ", Resultado ok" : "");
+        return;
     }
-    tem_resultado = false;
-    printf("JSON carregado. AF1 ok%s.\n", tem_af2 ? ", AF2 ok" : "");
+
+    JsonBloco bloco;
+    if (!escolher_bloco_json(tem2, tem_res, &bloco)) {
+        return;
+    }
+
+    if (!copiar_bloco_json(&novo1, &novo2, &novo_res, bloco, tem2, tem_res,
+                           destino, erro, sizeof(erro))) {
+        printf("Erro: %s\n", erro);
+        return;
+    }
+
+    printf("%s carregado (%s) de '%s'.\n", nome_slot, nome_bloco_json(bloco),
+           caminho);
 }
 
 static void aplicar_unario(bool (*fn)(const Automato *, Automato *, char *, int),
                            const char *nome) {
-    if (!precisa_af1()) {
+    const Automato *entrada = escolher_automato_unario();
+    if (entrada == NULL) {
         return;
     }
     char erro[256];
     Automato saida;
-    if (!fn(&af1, &saida, erro, sizeof(erro))) {
+    if (!fn(entrada, &saida, erro, sizeof(erro))) {
         printf("[%s] %s\n", nome, erro);
         return;
     }
@@ -181,36 +558,46 @@ static void aplicar_binario(
 }
 
 static void acao_testar_terminal(void) {
-    if (!precisa_af1()) {
+    const Automato *af = escolher_automato_unario();
+    if (af == NULL) {
         return;
     }
+    char entrada[512];
     char palavra[512];
     char erro[256];
     bool aceita = false;
 
-    printf("Palavra (linha vazia encerra): ");
-    while (1) {
-        ler_linha(palavra, sizeof(palavra));
-        if (palavra[0] == '\0') {
+    printf("Palavra (use ε ou <vazio> para palavra vazia; linha vazia encerra): ");
+    while (ler_linha(entrada, sizeof(entrada))) {
+        if (entrada[0] == '\0') {
             break;
         }
-        if (!testar_palavra(&af1, palavra, &aceita, erro, sizeof(erro))) {
+        copiar_palavra_teste(entrada, palavra, sizeof(palavra));
+        if (!testar_palavra(af, palavra, &aceita, erro, sizeof(erro))) {
             printf("Erro: %s\n", erro);
             break;
         }
-        printf("%s → %s\n", palavra, aceita ? "ACEITA" : "REJEITA");
+        if (palavra[0] == '\0') {
+            printf("ε → %s\n", aceita ? "ACEITA" : "REJEITA");
+        } else {
+            printf("%s → %s\n", palavra, aceita ? "ACEITA" : "REJEITA");
+        }
         printf("Palavra: ");
     }
 }
 
 static void acao_testar_arquivo(void) {
-    if (!precisa_af1()) {
+    const Automato *af = escolher_automato_unario();
+    if (af == NULL) {
         return;
     }
     char caminho[512];
     char erro[256];
     printf("Caminho do arquivo de palavras: ");
-    ler_linha(caminho, sizeof(caminho));
+    if (!ler_linha(caminho, sizeof(caminho)) || caminho[0] == '\0') {
+        printf("Caminho vazio.\n");
+        return;
+    }
 
     FILE *f = fopen(caminho, "r");
     if (!f) {
@@ -219,20 +606,28 @@ static void acao_testar_arquivo(void) {
     }
 
     char linha[512];
+    char palavra[512];
     while (fgets(linha, sizeof(linha), f)) {
         size_t n = strlen(linha);
         if (n > 0 && linha[n - 1] == '\n') {
             linha[n - 1] = '\0';
         }
-        if (linha[0] == '\0') {
-            continue;
-        }
+        remover_cr(linha);
+        copiar_palavra_teste(linha, palavra, sizeof(palavra));
         bool aceita = false;
-        if (!testar_palavra(&af1, linha, &aceita, erro, sizeof(erro))) {
-            printf("Erro em '%s': %s\n", linha, erro);
+        if (!testar_palavra(af, palavra, &aceita, erro, sizeof(erro))) {
+            if (palavra[0] == '\0') {
+                printf("Erro na palavra vazia: %s\n", erro);
+            } else {
+                printf("Erro em '%s': %s\n", palavra, erro);
+            }
             break;
         }
-        printf("%s → %s\n", linha, aceita ? "ACEITA" : "REJEITA");
+        if (palavra[0] == '\0') {
+            printf("ε → %s\n", aceita ? "ACEITA" : "REJEITA");
+        } else {
+            printf("%s → %s\n", palavra, aceita ? "ACEITA" : "REJEITA");
+        }
     }
     fclose(f);
 }
@@ -244,7 +639,10 @@ static void acao_exportar(void) {
     char caminho[512];
     char erro[256];
     printf("Caminho de saída JSON: ");
-    ler_linha(caminho, sizeof(caminho));
+    if (!ler_linha(caminho, sizeof(caminho)) || caminho[0] == '\0') {
+        printf("Caminho vazio.\n");
+        return;
+    }
 
     if (!exportar_json(&af1, &af2, tem_af2, &af_resultado, tem_resultado,
                        caminho, erro, sizeof(erro))) {
@@ -282,6 +680,11 @@ int main(void) {
         mostrar_menu();
         if (scanf("%d", &opcao) != 1) {
             limpar_entrada();
+            if (feof(stdin)) {
+                printf("\nFim da entrada. Saindo.\n");
+                opcao = 0;
+                break;
+            }
             printf("Opção inválida.\n");
             continue;
         }
