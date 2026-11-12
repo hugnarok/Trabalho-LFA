@@ -13,7 +13,7 @@ make
 ./lfa
 ```
 
-No menu, use a opção **1** (Carregar JSON): escolha o **destino** (AF1, AF2 ou AF Resultado). Na lista de origem, use **9** para copiar o **AF Resultado** (ou **7**/**8** para AF1/AF2) já em memória — útil após uma conversão sem exportar JSON. Para arquivo, escolha um exemplo ou `0` e depois o bloco (`automato1`, `automato2` ou `resultado`).
+Menu conforme o enunciado: opções **1 a 13** e **0) Sair**. Na opção **1**, há submenus para carregar AF1/AF2/Resultado, copiar da memória (7–9) ou **5) Copiar entre slots**. **12)** permite exportar completo ou só um autômato. Após conversão, pode copiar Resultado para **AF1**, **AF2** ou ambos. Opção **7)** + Enter testa com `data/palavras.txt`.
 
 ## Estrutura
 

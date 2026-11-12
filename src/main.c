@@ -12,6 +12,8 @@ static bool tem_af1 = false;
 static bool tem_af2 = false;
 static bool tem_resultado = false;
 
+static void acao_copiar_slots(void);
+
 static void limpar_entrada(void) {
     int c;
     while ((c = getchar()) != '\n' && c != EOF) {
@@ -62,14 +64,36 @@ static void copiar_palavra_teste(const char *entrada, char *palavra, int tam) {
     snprintf(palavra, (size_t)tam, "%s", entrada);
 }
 
+static void resumo_automato(const Automato *af, bool carregado, char *buf,
+                            int tam) {
+    if (!carregado || af->n_estados <= 0) {
+        snprintf(buf, (size_t)tam, "vazio");
+        return;
+    }
+    const char *tipo;
+    if (automato_tem_lambda(af)) {
+        tipo = "AFN-λ";
+    } else if (automato_eh_deterministico(af)) {
+        tipo = "AFD";
+    } else {
+        tipo = "AFN";
+    }
+    snprintf(buf, (size_t)tam, "%s · %d est. · |Σ|=%d", tipo, af->n_estados,
+             af->n_alfabeto);
+}
+
 static void mostrar_menu(void) {
+    char r1[64], r2[64], r3[64];
+    resumo_automato(&af1, tem_af1, r1, (int)sizeof(r1));
+    resumo_automato(&af2, tem_af2, r2, (int)sizeof(r2));
+    resumo_automato(&af_resultado, tem_resultado, r3, (int)sizeof(r3));
+
     printf("\n======== Trabalho LFA — Autômatos (C) ========\n");
-    printf("AF1: %s | AF2: %s | Resultado: %s\n",
-           tem_af1 ? "carregado" : "vazio",
-           tem_af2 ? "carregado" : "vazio",
-           tem_resultado ? "carregado" : "vazio");
+    printf("  AF1:        %s\n", r1);
+    printf("  AF2:        %s\n", r2);
+    printf("  Resultado:  %s\n", r3);
     printf("----------------------------------------------\n");
-    printf(" 1) Carregar JSON (AF1 / AF2)\n");
+    printf(" 1) Carregar JSON\n");
     printf(" 2) Converter AFN múltiplo-estado → AFN-λ\n");
     printf(" 3) Converter AFN-λ → AFN\n");
     printf(" 4) Converter AFN → AFD\n");
@@ -78,20 +102,12 @@ static void mostrar_menu(void) {
     printf(" 7) Testar palavras (arquivo)\n");
     printf(" 8) União\n");
     printf(" 9) Interseção\n");
-    printf("10) Subtração\n");
-    printf("11) Complemento\n");
-    printf("12) Exportar\n");
-    printf("13) Mostrar autômatos em memória\n");
+    printf(" 10) Subtração\n");
+    printf(" 11) Complemento\n");
+    printf(" 12) Exportar\n");
+    printf(" 13) Mostrar autômatos em memória\n");
     printf(" 0) Sair\n");
     printf("Escolha: ");
-}
-
-static bool precisa_af1(void) {
-    if (!tem_af1) {
-        printf("Carregue um JSON com automato1 primeiro.\n");
-        return false;
-    }
-    return true;
 }
 
 static bool precisa_dois_afds(void) {
@@ -103,41 +119,20 @@ static bool precisa_dois_afds(void) {
 }
 
 static const Automato *escolher_automato_unario(void) {
-    int opcoes = 0;
-    if (tem_af1) {
-        opcoes++;
-    }
-    if (tem_af2) {
-        opcoes++;
-    }
-    if (tem_resultado) {
-        opcoes++;
-    }
-
-    if (opcoes == 0) {
+    if (!tem_af1 && !tem_af2 && !tem_resultado) {
         printf("Nenhum autômato carregado. Use a opção 1 primeiro.\n");
         return NULL;
     }
-    if (opcoes == 1) {
-        if (tem_resultado) {
-            return &af_resultado;
-        }
-        if (tem_af2) {
-            return &af2;
-        }
-        return &af1;
-    }
 
-    printf("\nQual autômato usar?\n");
-    if (tem_af1) {
-        printf(" 1) AF1\n");
-    }
-    if (tem_af2) {
-        printf(" 2) AF2\n");
-    }
-    if (tem_resultado) {
-        printf(" 3) AF Resultado\n");
-    }
+    char r1[64], r2[64], r3[64];
+    resumo_automato(&af1, tem_af1, r1, (int)sizeof(r1));
+    resumo_automato(&af2, tem_af2, r2, (int)sizeof(r2));
+    resumo_automato(&af_resultado, tem_resultado, r3, (int)sizeof(r3));
+
+    printf("\nQual autômato usar na operação?\n");
+    printf(" 1) AF1 — %s\n", r1);
+    printf(" 2) AF2 — %s\n", r2);
+    printf(" 3) AF Resultado — %s\n", r3);
     printf("Número: ");
 
     int num = -1;
@@ -148,17 +143,29 @@ static const Automato *escolher_automato_unario(void) {
     }
     limpar_entrada();
 
-    if (num == 1 && tem_af1) {
+    if (num == 1) {
+        if (!tem_af1) {
+            printf("AF1 está vazio.\n");
+            return NULL;
+        }
         return &af1;
     }
-    if (num == 2 && tem_af2) {
+    if (num == 2) {
+        if (!tem_af2) {
+            printf("AF2 está vazio.\n");
+            return NULL;
+        }
         return &af2;
     }
-    if (num == 3 && tem_resultado) {
+    if (num == 3) {
+        if (!tem_resultado) {
+            printf("AF Resultado está vazio.\n");
+            return NULL;
+        }
         return &af_resultado;
     }
 
-    printf("Opção inválida.\n");
+    printf("Opção inválida (use 1, 2 ou 3).\n");
     return NULL;
 }
 
@@ -408,6 +415,7 @@ static void acao_carregar(void) {
     printf(" 3) Carregar no AF Resultado\n");
     printf(" 4) Carregar AF1, AF2 e Resultado do mesmo arquivo (carga "
            "completa)\n");
+    printf(" 5) Copiar entre slots (ex.: Resultado → AF1)\n");
     printf(" 0) Voltar\n");
     printf("Escolha: ");
 
@@ -426,8 +434,13 @@ static void acao_carregar(void) {
     if (slot == 0) {
         return;
     }
-    if (slot < 1 || slot > 4) {
-        printf("Opção inválida (use 1–4 ou 0).\n");
+    if (slot < 1 || slot > 5) {
+        printf("Opção inválida (use 1–5 ou 0).\n");
+        return;
+    }
+
+    if (slot == 5) {
+        acao_copiar_slots();
         return;
     }
 
@@ -523,6 +536,56 @@ static void acao_carregar(void) {
            caminho);
 }
 
+static void perguntar_copiar_resultado(void) {
+    printf("\nCopiar AF Resultado para qual slot?\n");
+    printf(" 1) AF1   2) AF2   3) AF1 e AF2   0) Não copiar\n");
+    printf("Escolha: ");
+
+    int op = -1;
+    if (scanf("%d", &op) != 1) {
+        limpar_entrada();
+        return;
+    }
+    limpar_entrada();
+
+    if (op == 0) {
+        return;
+    }
+    if (op != 1 && op != 2 && op != 3) {
+        printf("Opção inválida.\n");
+        return;
+    }
+
+    char erro[256];
+    bool copiou_af1 = false;
+    bool copiou_af2 = false;
+
+    if (op == 1 || op == 3) {
+        if (!copiar_da_memoria(FONTE_MEM_RESULTADO, &af1, erro, sizeof(erro))) {
+            printf("Erro ao copiar para AF1: %s\n", erro);
+        } else {
+            tem_af1 = true;
+            copiou_af1 = true;
+        }
+    }
+    if (op == 2 || op == 3) {
+        if (!copiar_da_memoria(FONTE_MEM_RESULTADO, &af2, erro, sizeof(erro))) {
+            printf("Erro ao copiar para AF2: %s\n", erro);
+        } else {
+            tem_af2 = true;
+            copiou_af2 = true;
+        }
+    }
+
+    if (copiou_af1 && copiou_af2) {
+        printf("AF1 e AF2 atualizados com cópia do Resultado.\n");
+    } else if (copiou_af1) {
+        printf("AF1 atualizado com cópia do Resultado.\n");
+    } else if (copiou_af2) {
+        printf("AF2 atualizado com cópia do Resultado.\n");
+    }
+}
+
 static void aplicar_unario(bool (*fn)(const Automato *, Automato *, char *, int),
                            const char *nome) {
     const Automato *entrada = escolher_automato_unario();
@@ -533,11 +596,16 @@ static void aplicar_unario(bool (*fn)(const Automato *, Automato *, char *, int)
     Automato saida;
     if (!fn(entrada, &saida, erro, sizeof(erro))) {
         printf("[%s] %s\n", nome, erro);
+        if (strstr(erro, "determin") != NULL ||
+            strstr(erro, "AFD") != NULL) {
+            printf("Dica: use a opção 4 (AFN → AFD) antes.\n");
+        }
         return;
     }
     af_resultado = saida;
     tem_resultado = true;
     printf("[%s] ok — resultado em AF Resultado.\n", nome);
+    perguntar_copiar_resultado();
 }
 
 static void aplicar_binario(
@@ -555,6 +623,135 @@ static void aplicar_binario(
     af_resultado = saida;
     tem_resultado = true;
     printf("[%s] ok — resultado em AF Resultado.\n", nome);
+    perguntar_copiar_resultado();
+}
+
+static bool slot_ocupado(int slot) {
+    if (slot == 1) {
+        return tem_af1;
+    }
+    if (slot == 2) {
+        return tem_af2;
+    }
+    if (slot == 3) {
+        return tem_resultado;
+    }
+    return false;
+}
+
+static Automato *ponteiro_slot(int slot) {
+    if (slot == 1) {
+        return &af1;
+    }
+    if (slot == 2) {
+        return &af2;
+    }
+    if (slot == 3) {
+        return &af_resultado;
+    }
+    return NULL;
+}
+
+static void marcar_slot_carregado(int slot) {
+    if (slot == 1) {
+        tem_af1 = true;
+    } else if (slot == 2) {
+        tem_af2 = true;
+    } else if (slot == 3) {
+        tem_resultado = true;
+    }
+}
+
+static const char *nome_slot(int slot) {
+    if (slot == 1) {
+        return "AF1";
+    }
+    if (slot == 2) {
+        return "AF2";
+    }
+    return "AF Resultado";
+}
+
+static bool copiar_slot_para_slot(int origem_slot, int destino_slot, char *erro,
+                                  int erro_tam) {
+    if (origem_slot == destino_slot) {
+        snprintf(erro, erro_tam, "origem e destino são o mesmo slot");
+        return false;
+    }
+    if (!slot_ocupado(origem_slot)) {
+        snprintf(erro, erro_tam, "%s está vazio", nome_slot(origem_slot));
+        return false;
+    }
+
+    FonteCarregamento fonte = (FonteCarregamento)origem_slot;
+    Automato *dest = ponteiro_slot(destino_slot);
+    if (dest == NULL) {
+        snprintf(erro, erro_tam, "slot destino inválido");
+        return false;
+    }
+    if (!copiar_da_memoria(fonte, dest, erro, erro_tam)) {
+        return false;
+    }
+    marcar_slot_carregado(destino_slot);
+    return true;
+}
+
+static void acao_copiar_slots(void) {
+    printf("\n--- Copiar entre slots ---\n");
+    printf("Atalhos:\n");
+    printf(" 1) Resultado → AF1\n");
+    printf(" 2) Resultado → AF2\n");
+    printf(" 3) AF1 → AF2\n");
+    printf(" 4) Escolher origem e destino\n");
+    printf(" 0) Voltar\n");
+    printf("Escolha: ");
+
+    int op = -1;
+    if (scanf("%d", &op) != 1) {
+        limpar_entrada();
+        printf("Opção inválida.\n");
+        return;
+    }
+    limpar_entrada();
+
+    int origem = 0;
+    int destino = 0;
+    if (op == 0) {
+        return;
+    }
+    if (op == 1) {
+        origem = 3;
+        destino = 1;
+    } else if (op == 2) {
+        origem = 3;
+        destino = 2;
+    } else if (op == 3) {
+        origem = 1;
+        destino = 2;
+    } else if (op == 4) {
+        printf("Origem: 1=AF1  2=AF2  3=Resultado: ");
+        if (scanf("%d", &origem) != 1) {
+            limpar_entrada();
+            return;
+        }
+        printf("Destino: 1=AF1  2=AF2  3=Resultado: ");
+        if (scanf("%d", &destino) != 1) {
+            limpar_entrada();
+            return;
+        }
+        limpar_entrada();
+    } else {
+        printf("Opção inválida.\n");
+        return;
+    }
+
+    char erro[256];
+    if (!copiar_slot_para_slot(origem, destino, erro, sizeof(erro))) {
+        printf("Erro: %s\n", erro);
+        return;
+    }
+    printf("%s atualizado com cópia de %s.\n", nome_slot(destino),
+           nome_slot(origem));
 }
 
 static void acao_testar_terminal(void) {
@@ -567,7 +764,15 @@ static void acao_testar_terminal(void) {
     char erro[256];
     bool aceita = false;
 
-    printf("Palavra (use ε ou <vazio> para palavra vazia; linha vazia encerra): ");
+    char resumo[64];
+    resumo_automato(af, true, resumo, (int)sizeof(resumo));
+    printf("Autômato: %s\n", resumo);
+    printf("Alfabeto: {");
+    for (int i = 0; i < af->n_alfabeto; i++) {
+        printf("%c%s", af->alfabeto[i], i + 1 < af->n_alfabeto ? ", " : "");
+    }
+    printf("}\n");
+    printf("Palavra (ε ou <vazio> = vazia; linha vazia encerra): ");
     while (ler_linha(entrada, sizeof(entrada))) {
         if (entrada[0] == '\0') {
             break;
@@ -593,10 +798,13 @@ static void acao_testar_arquivo(void) {
     }
     char caminho[512];
     char erro[256];
-    printf("Caminho do arquivo de palavras: ");
-    if (!ler_linha(caminho, sizeof(caminho)) || caminho[0] == '\0') {
-        printf("Caminho vazio.\n");
+    printf("Arquivo de palavras [Enter = data/palavras.txt]: ");
+    if (!ler_linha(caminho, sizeof(caminho))) {
         return;
+    }
+    if (caminho[0] == '\0') {
+        snprintf(caminho, sizeof(caminho), "data/palavras.txt");
+        printf("Usando %s\n", caminho);
     }
 
     FILE *f = fopen(caminho, "r");
@@ -633,9 +841,30 @@ static void acao_testar_arquivo(void) {
 }
 
 static void acao_exportar(void) {
-    if (!precisa_af1()) {
+    if (!tem_af1 && !tem_af2 && !tem_resultado) {
+        printf("Nada para exportar. Carregue ou calcule um autômato primeiro.\n");
         return;
     }
+
+    printf("\n--- Exportar JSON ---\n");
+    printf(" 1) Arquivo completo (AF1 + AF2 + Resultado, se existirem)\n");
+    printf(" 2) Só AF Resultado\n");
+    printf(" 3) Só AF1\n");
+    printf(" 4) Só AF2\n");
+    printf(" 0) Voltar\n");
+    printf("Escolha: ");
+
+    int modo = -1;
+    if (scanf("%d", &modo) != 1) {
+        limpar_entrada();
+        printf("Opção inválida.\n");
+        return;
+    }
+    limpar_entrada();
+    if (modo == 0) {
+        return;
+    }
+
     char caminho[512];
     char erro[256];
     printf("Caminho de saída JSON: ");
@@ -644,8 +873,39 @@ static void acao_exportar(void) {
         return;
     }
 
-    if (!exportar_json(&af1, &af2, tem_af2, &af_resultado, tem_resultado,
-                       caminho, erro, sizeof(erro))) {
+    bool ok = false;
+    if (modo == 1) {
+        if (!tem_af1) {
+            printf("Exportação completa exige pelo menos AF1 carregado.\n");
+            return;
+        }
+        ok = exportar_json(&af1, &af2, tem_af2, &af_resultado, tem_resultado,
+                            caminho, erro, sizeof(erro));
+    } else if (modo == 2) {
+        if (!tem_resultado) {
+            printf("AF Resultado está vazio.\n");
+            return;
+        }
+        ok = exportar_um_af(&af_resultado, "resultado", caminho, erro,
+                              sizeof(erro));
+    } else if (modo == 3) {
+        if (!tem_af1) {
+            printf("AF1 está vazio.\n");
+            return;
+        }
+        ok = exportar_um_af(&af1, "automato1", caminho, erro, sizeof(erro));
+    } else if (modo == 4) {
+        if (!tem_af2) {
+            printf("AF2 está vazio.\n");
+            return;
+        }
+        ok = exportar_um_af(&af2, "automato2", caminho, erro, sizeof(erro));
+    } else {
+        printf("Opção inválida.\n");
+        return;
+    }
+
+    if (!ok) {
         printf("Erro: %s\n", erro);
         return;
     }
