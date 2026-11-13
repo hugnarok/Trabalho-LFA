@@ -6,16 +6,20 @@
 
 ## Pré-requisitos
 
-- Autômato válido e **determinístico**.
-- Cada caractere da palavra pertence ao `alfabeto`; senão **erro** (não aceita/rejeita silenciosamente).
+- Autômato válido: **AFD, AFN ou AFN-λ** (não precisa determinizar antes).
+- Cada caractere da palavra pertence ao `alfabeto`; senão a função devolve **erro**. No menu, isso aparece como `palavra → REJEITA (símbolo 'x' fora do alfabeto)` e o teste continua.
 
 ## Algoritmo
 
-1. Estado atual = índice do inicial.
-2. Para cada caractere: busca transição única `(estado, símbolo)`; se não houver → `aceita = false`, fim.
-3. Após a palavra: `aceita =` estado atual é final.
+Simulação por conjunto de estados:
 
-**ε:** string vazia → aceita iff o inicial é final.
+1. Ativos = fecho-λ do estado inicial.
+2. Para cada caractere: ativos = fecho-λ de todos os destinos `(ativo, símbolo)`. Se ficar vazio → `aceita = false`, fim.
+3. Após a palavra: `aceita =` algum estado ativo é final.
+
+Para um AFD, o conjunto sempre tem um único estado, então é a simulação usual.
+
+**ε:** string vazia → aceita se o fecho-λ do inicial contém um final (num AFD: se o inicial é final).
 
 ## Menu — opção 6
 
@@ -28,8 +32,4 @@
 
 - Enter → `data/palavras.txt`.
 - Uma palavra por linha; linha vazia = ε.
-
-## Limitações
-
-- Não simula AFN nem transições `&`.
-- Converta para AFD (opções 3–4) antes de testar.
+- Palavra com símbolo fora do alfabeto → `REJEITA` e segue para a próxima linha.
