@@ -4,9 +4,9 @@
 #include <stdbool.h>
 
 #define MAX_NOME 64
-#define MAX_ESTADOS 128
+#define MAX_ESTADOS 256
 #define MAX_ALFABETO 32
-#define MAX_TRANSICOES 1024
+#define MAX_TRANSICOES 4096
 #define SIMBOLO_LAMBDA '&'
 
 typedef struct {

@@ -16,6 +16,7 @@ static bool tem_af2 = false;
 static bool tem_resultado = false;
 
 static void acao_copiar_slots(void);
+static void marcar_slot_carregado(int slot);
 
 static void limpar_entrada(void) {
     int c;
@@ -57,6 +58,50 @@ static bool ler_linha(char *buf, int tam) {
 static bool palavra_vazia_especial(const char *s) {
     return strcmp(s, "ε") == 0 || strcmp(s, "<vazio>") == 0 ||
            strcmp(s, "<epsilon>") == 0 || strcmp(s, "<e>") == 0;
+}
+
+/* Primeiro símbolo da palavra fora do alfabeto do AF, ou '\0' se todos ok. */
+static char simbolo_fora_do_alfabeto(const Automato *af, const char *palavra) {
+    for (const char *p = palavra; *p != '\0'; p++) {
+        bool achou = false;
+        for (int i = 0; i < af->n_alfabeto; i++) {
+            if (af->alfabeto[i] == *p) {
+                achou = true;
+                break;
+            }
+        }
+        if (!achou) {
+            return *p;
+        }
+    }
+    return '\0';
+}
+
+/*
+ * Testa uma palavra e imprime "palavra → ACEITA|REJEITA".
+ * Símbolo fora do alfabeto conta como REJEITA (e o teste segue).
+ * Retorna false só em erro do autômato (aí não adianta testar o resto).
+ */
+static bool testar_e_imprimir(const Automato *af, const char *palavra) {
+    const char *exibir = palavra;
+    if (palavra[0] == '\0') {
+        exibir = "ε"; /* palavra vazia */
+    }
+
+    char fora = simbolo_fora_do_alfabeto(af, palavra);
+    if (fora != '\0') {
+        printf("%s → REJEITA (símbolo '%c' fora do alfabeto)\n", exibir, fora);
+        return true;
+    }
+
+    char erro[256];
+    bool aceita = false;
+    if (!testar_palavra(af, palavra, &aceita, erro, sizeof(erro))) {
+        printf("Erro: %s\n", erro);
+        return false;
+    }
+    printf("%s → %s\n", exibir, aceita ? "ACEITA" : "REJEITA");
+    return true;
 }
 
 static void copiar_palavra_teste(const char *entrada, char *palavra, int tam) {
@@ -332,8 +377,9 @@ static bool copiar_da_memoria(FonteCarregamento fonte, Automato *destino,
         return false;
     }
 
-    if (!automato_validar(origem, erro, erro_tam)) {
-        snprintf(erro, erro_tam, "%s: %s", nome, erro);
+    char msg[256];
+    if (!automato_validar(origem, msg, sizeof(msg))) {
+        snprintf(erro, erro_tam, "%s: %s", nome, msg);
         return false;
     }
 
@@ -504,20 +550,18 @@ static void acao_carregar(void) {
         return;
     }
 
+    /* O slot só é marcado como carregado depois que a cópia der certo. */
     Automato *destino = NULL;
     const char *nome_slot = NULL;
     if (slot == 1) {
         destino = &af1;
         nome_slot = "AF1";
-        tem_af1 = true;
     } else if (slot == 2) {
         destino = &af2;
         nome_slot = "AF2";
-        tem_af2 = true;
     } else if (slot == 3) {
         destino = &af_resultado;
         nome_slot = "AF Resultado";
-        tem_resultado = true;
     }
 
     if (slot != 4 && fonte != FONTE_ARQUIVO_JSON) {
@@ -528,12 +572,13 @@ static void acao_carregar(void) {
             printf("Erro: %s\n", erro);
             return;
         }
+        marcar_slot_carregado(slot);
         printf("%s atualizado com cópia de %s (memória).\n", nome_slot,
                nome_fonte);
         return;
     }
 
-    Automato novo1, novo2, novo_res;
+    static Automato novo1, novo2, novo_res; /* grandes demais para a pilha */
     bool tem2 = false;
     bool tem_res = false;
     if (!carregar_do_arquivo(caminho, erro, sizeof(erro), &novo1, &novo2,
@@ -574,6 +619,7 @@ static void acao_carregar(void) {
         printf("Erro: %s\n", erro);
         return;
     }
+    marcar_slot_carregado(slot);
 
     printf("%s carregado (%s) de '%s'.\n", nome_slot, nome_bloco_json(bloco),
            caminho);
@@ -636,7 +682,7 @@ static void aplicar_unario(bool (*fn)(const Automato *, Automato *, char *, int)
         return;
     }
     char erro[256];
-    Automato saida;
+    static Automato saida; /* grande demais para a pilha */
     if (!fn(entrada, &saida, erro, sizeof(erro))) {
         printf("[%s] %s\n", nome, erro);
         if (strstr(erro, "determin") != NULL ||
@@ -658,7 +704,7 @@ static void aplicar_binario(
         return;
     }
     char erro[256];
-    Automato saida;
+    static Automato saida; /* grande demais para a pilha */
     if (!fn(&af1, &af2, &saida, erro, sizeof(erro))) {
         printf("[%s] %s\n", nome, erro);
         return;
@@ -804,8 +850,6 @@ static void acao_testar_terminal(void) {
     }
     char entrada[512];
     char palavra[512];
-    char erro[256];
-    bool aceita = false;
 
     char resumo[64];
     resumo_automato(af, true, resumo, (int)sizeof(resumo));
@@ -821,14 +865,8 @@ static void acao_testar_terminal(void) {
             break;
         }
         copiar_palavra_teste(entrada, palavra, sizeof(palavra));
-        if (!testar_palavra(af, palavra, &aceita, erro, sizeof(erro))) {
-            printf("Erro: %s\n", erro);
+        if (!testar_e_imprimir(af, palavra)) {
             break;
-        }
-        if (palavra[0] == '\0') {
-            printf("ε → %s\n", aceita ? "ACEITA" : "REJEITA");
-        } else {
-            printf("%s → %s\n", palavra, aceita ? "ACEITA" : "REJEITA");
         }
         printf("Palavra: ");
     }
@@ -840,7 +878,6 @@ static void acao_testar_arquivo(void) {
         return;
     }
     char caminho[512];
-    char erro[256];
     printf("Arquivo de palavras [Enter = data/palavras.txt]: ");
     if (!ler_linha(caminho, sizeof(caminho))) {
         return;
@@ -865,19 +902,8 @@ static void acao_testar_arquivo(void) {
         }
         remover_cr(linha);
         copiar_palavra_teste(linha, palavra, sizeof(palavra));
-        bool aceita = false;
-        if (!testar_palavra(af, palavra, &aceita, erro, sizeof(erro))) {
-            if (palavra[0] == '\0') {
-                printf("Erro na palavra vazia: %s\n", erro);
-            } else {
-                printf("Erro em '%s': %s\n", palavra, erro);
-            }
+        if (!testar_e_imprimir(af, palavra)) {
             break;
-        }
-        if (palavra[0] == '\0') {
-            printf("ε → %s\n", aceita ? "ACEITA" : "REJEITA");
-        } else {
-            printf("%s → %s\n", palavra, aceita ? "ACEITA" : "REJEITA");
         }
     }
     fclose(f);

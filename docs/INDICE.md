@@ -46,7 +46,7 @@ Todas as opções 2–11 gravam o resultado em **AF Resultado** (e o menu pode c
 
 1. **Carregar** JSON em `data/` (opção 1).
 2. Se for AFN: **2 → 3 → 4** (ou pular etapas conforme o autômato).
-3. **6 ou 7** para testar palavras (exige AFD).
+3. **6 ou 7** para testar palavras (AFD, AFN ou AFN-λ).
 4. **8–11** se precisar de duas linguagens (AF1 e AF2 AFD).
 5. **12** para exportar; **13** para inspecionar.
 
