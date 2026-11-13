@@ -32,7 +32,9 @@ src/                        # implementação (.c)
   main.c                    # menu + AF1 / AF2 / AF Resultado
 data/                       # JSONs e palavras de teste
 docs/
-  docs_operacoes.md           # explicação das operações de união, subtração, complemento e interseção
+  INDICE.md                   # índice da documentação + como gerar PDF de estudo
+  doc_*.md                    # base, JSON, conversão, minimização, teste, menu
+  docs_operacoes.md           # união, interseção, subtração e complemento
 INSTRUCOES.md               # enunciado e divisão do grupo
 ```
 

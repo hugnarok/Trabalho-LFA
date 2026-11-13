@@ -133,4 +133,4 @@ Resultados esperados com `dois_afds.json`:
 - `src/operacoes.c` está no `SRC` do `Makefile`.
 - Os stubs de união, interseção, subtração e complemento foram removidos de `src/funcoes_stubs.c`.
 - O menu chama as funções nas opções 8 a 11 e guarda o resultado em `AF Resultado`.
-- Hoje o menu usa sempre `AF1` nas operações unárias. Para aplicar complemento no `AF Resultado`, seria preciso ajustar o `main.c`.
+- Na opção **11** (`complemento`), o usuário escolhe AF1, AF2 ou Resultado como entrada (`escolher_automato_unario` em `main.c`), como nas opções 2–5.
