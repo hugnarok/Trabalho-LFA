@@ -13,7 +13,9 @@ make
 ./lfa
 ```
 
-Menu conforme o enunciado: opções **1 a 13** e **0) Sair**. Na opção **1**, há submenus para carregar AF1/AF2/Resultado, copiar da memória (7–9) ou **5) Copiar entre slots**. **12)** permite exportar completo ou só um autômato. Após conversão, pode copiar Resultado para **AF1**, **AF2** ou ambos. Opção **7)** + Enter testa com `data/palavras.txt`.
+Menu conforme o enunciado: opções **1 a 13** e **0) Sair**. Na opção **1**, os arquivos **`data/*.json`** aparecem na lista (o professor coloca os JSONs na pasta `data/`). Use **0** para outro caminho. Memória: números **após** a lista de arquivos. **12)** exporta completo ou só um autômato. **7)** + Enter usa `data/palavras.txt`.
+
+Compilar no Linux: `make && ./lfa` (o executável do Mac não é portável).
 
 ## Estrutura
 

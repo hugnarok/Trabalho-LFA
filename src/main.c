@@ -2,8 +2,11 @@
 #include "funcoes.h"
 #include "json_io.h"
 
+#include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 static Automato af1;
 static Automato af2;
@@ -169,21 +172,41 @@ static const Automato *escolher_automato_unario(void) {
     return NULL;
 }
 
-typedef struct {
-    const char *nome;
-    const char *caminho;
-} AutomatoExemplo;
+#define PASTA_JSON "data"
+#define MAX_LISTA_JSON 64
 
-static const AutomatoExemplo AUTOMATOS_EXEMPLO[] = {
-    {"AFD simples", "data/afd_simples.json"},
-    {"AFD parcial (complemento)", "data/afd_parcial.json"},
-    {"AFN-λ", "data/afn_lambda.json"},
-    {"AFN não determinístico", "data/afn_nao_deterministico.json"},
-    {"Dois AFDs (união/interseção)", "data/dois_afds.json"},
-    {"AFDs com alfabetos diferentes", "data/afds_alfabetos_diferentes.json"},
-};
-static const int N_AUTOMATOS_EXEMPLO =
-    (int)(sizeof(AUTOMATOS_EXEMPLO) / sizeof(AUTOMATOS_EXEMPLO[0]));
+static int comparar_caminhos(const void *a, const void *b) {
+    return strcmp((const char *)a, (const char *)b);
+}
+
+/* Lista arquivos .json em PASTA_JSON (caminhos relativos data/nome.json). */
+static int listar_json_na_pasta(char lista[][512]) {
+    DIR *dir = opendir(PASTA_JSON);
+    if (dir == NULL) {
+        return -1;
+    }
+
+    int n = 0;
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL && n < MAX_LISTA_JSON) {
+        const char *nome = ent->d_name;
+        size_t len = strlen(nome);
+        if (len < 6) {
+            continue;
+        }
+        if (strcasecmp(nome + len - 5, ".json") != 0) {
+            continue;
+        }
+        snprintf(lista[n], 512, "%s/%s", PASTA_JSON, nome);
+        n++;
+    }
+    closedir(dir);
+
+    if (n > 1) {
+        qsort(lista, (size_t)n, 512, comparar_caminhos);
+    }
+    return n;
+}
 
 typedef enum {
     FONTE_ARQUIVO_JSON = 0,
@@ -192,23 +215,36 @@ typedef enum {
     FONTE_MEM_RESULTADO = 3
 } FonteCarregamento;
 
-#define OPC_MEM_AF1 7
-#define OPC_MEM_AF2 8
-#define OPC_MEM_RESULTADO 9
-
 static bool escolher_fonte_carregamento(FonteCarregamento *fonte, char *caminho,
                                           int tam) {
+    char lista[MAX_LISTA_JSON][512];
+    int n_json = listar_json_na_pasta(lista);
+
     printf("\nOrigem do autômato:\n");
-    printf("--- Arquivos JSON ---\n");
-    for (int i = 0; i < N_AUTOMATOS_EXEMPLO; i++) {
-        printf("  %d) %s\n", i + 1, AUTOMATOS_EXEMPLO[i].nome);
+    printf("--- Arquivos em %s/ ---\n", PASTA_JSON);
+    if (n_json < 0) {
+        printf("  (pasta '%s' não encontrada)\n", PASTA_JSON);
+        n_json = 0;
+    } else if (n_json == 0) {
+        printf("  (nenhum arquivo .json — coloque os JSONs na pasta ou use 0)\n");
+    } else {
+        for (int i = 0; i < n_json; i++) {
+            const char *nome = strrchr(lista[i], '/');
+            nome = nome != NULL ? nome + 1 : lista[i];
+            printf("  %d) %s\n", i + 1, nome);
+        }
     }
     printf("  0) Digitar outro caminho\n");
+
+    int op_resultado = n_json + 1;
+    int op_af1 = n_json + 2;
+    int op_af2 = n_json + 3;
+
     printf("--- Já em memória ---\n");
-    printf("  %d) AF Resultado%s\n", OPC_MEM_RESULTADO,
+    printf("  %d) AF Resultado%s\n", op_resultado,
            tem_resultado ? "" : " (vazio)");
-    printf("  %d) AF1%s\n", OPC_MEM_AF1, tem_af1 ? "" : " (vazio)");
-    printf("  %d) AF2%s\n", OPC_MEM_AF2, tem_af2 ? "" : " (vazio)");
+    printf("  %d) AF1%s\n", op_af1, tem_af1 ? "" : " (vazio)");
+    printf("  %d) AF2%s\n", op_af2, tem_af2 ? "" : " (vazio)");
     printf("Número: ");
 
     int num = -1;
@@ -219,7 +255,7 @@ static bool escolher_fonte_carregamento(FonteCarregamento *fonte, char *caminho,
     }
     limpar_entrada();
 
-    if (num == OPC_MEM_RESULTADO) {
+    if (num == op_resultado) {
         if (!tem_resultado) {
             printf("AF Resultado está vazio. Faça uma conversão/operação "
                    "antes.\n");
@@ -229,7 +265,7 @@ static bool escolher_fonte_carregamento(FonteCarregamento *fonte, char *caminho,
         caminho[0] = '\0';
         return true;
     }
-    if (num == OPC_MEM_AF1) {
+    if (num == op_af1) {
         if (!tem_af1) {
             printf("AF1 está vazio.\n");
             return false;
@@ -238,7 +274,7 @@ static bool escolher_fonte_carregamento(FonteCarregamento *fonte, char *caminho,
         caminho[0] = '\0';
         return true;
     }
-    if (num == OPC_MEM_AF2) {
+    if (num == op_af2) {
         if (!tem_af2) {
             printf("AF2 está vazio.\n");
             return false;
@@ -258,14 +294,21 @@ static bool escolher_fonte_carregamento(FonteCarregamento *fonte, char *caminho,
         return true;
     }
 
-    if (num < 1 || num > N_AUTOMATOS_EXEMPLO) {
-        printf("Número fora da lista (1–%d, %d–%d ou 0).\n",
-               N_AUTOMATOS_EXEMPLO, OPC_MEM_AF1, OPC_MEM_RESULTADO);
+    if (num < 1 || num > n_json) {
+        if (n_json == 0) {
+            printf("Número fora da lista (0, %d–%d).\n", op_resultado,
+                   op_af2);
+        } else {
+            printf("Número fora da lista (1–%d, 0 ou %d–%d).\n", n_json,
+                   op_resultado, op_af2);
+        }
         return false;
     }
 
-    snprintf(caminho, (size_t)tam, "%s", AUTOMATOS_EXEMPLO[num - 1].caminho);
-    printf("Selecionado: %s (%s)\n", AUTOMATOS_EXEMPLO[num - 1].nome, caminho);
+    snprintf(caminho, (size_t)tam, "%s", lista[num - 1]);
+    const char *nome = strrchr(caminho, '/');
+    nome = nome != NULL ? nome + 1 : caminho;
+    printf("Selecionado: %s\n", nome);
     *fonte = FONTE_ARQUIVO_JSON;
     return true;
 }
