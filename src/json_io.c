@@ -20,6 +20,10 @@ static bool consumir(const char **p, char c) {
     return true;
 }
 
+/*
+ * Lê uma string JSON. Trata os escapes simples (\" \\ \/ \n \t \r).
+ * Escapes \uXXXX não são suportados: escreva o caractere direto no arquivo.
+ */
 static bool ler_string(const char **p, char *out, int out_tam) {
     pular_espacos(p);
     if (**p != '"') {
@@ -29,10 +33,28 @@ static bool ler_string(const char **p, char *out, int out_tam) {
 
     int i = 0;
     while (**p && **p != '"') {
+        char c = **p;
+
+        if (c == '\\') {
+            (*p)++; /* pula a barra e olha o caractere seguinte */
+            char escapado = **p;
+            if (escapado == 'n') {
+                c = '\n';
+            } else if (escapado == 't') {
+                c = '\t';
+            } else if (escapado == 'r') {
+                c = '\r';
+            } else if (escapado == '"' || escapado == '\\' || escapado == '/') {
+                c = escapado;
+            } else {
+                return false; /* escape não suportado */
+            }
+        }
+
         if (i + 1 >= out_tam) {
             return false;
         }
-        out[i++] = **p;
+        out[i++] = c;
         (*p)++;
     }
     if (**p != '"') {
@@ -41,6 +63,71 @@ static bool ler_string(const char **p, char *out, int out_tam) {
     (*p)++;
     out[i] = '\0';
     return true;
+}
+
+/* Avança p até depois do fim da string que começa em p (aspas inclusas). */
+static bool pular_string(const char **p) {
+    (*p)++; /* aspas de abertura */
+    while (**p && **p != '"') {
+        if (**p == '\\' && (*p)[1] != '\0') {
+            (*p)++; /* pula o caractere escapado */
+        }
+        (*p)++;
+    }
+    if (**p != '"') {
+        return false;
+    }
+    (*p)++; /* aspas de fechamento */
+    return true;
+}
+
+/*
+ * Pula um valor JSON qualquer. Usado para ignorar campos que o programa não
+ * conhece (ex.: "nome", "tipo"). Para objetos e arrays, conta a abertura e o
+ * fechamento de { [ ] } até voltar ao nível zero.
+ */
+static bool pular_valor(const char **p) {
+    pular_espacos(p);
+
+    if (**p == '"') {
+        return pular_string(p);
+    }
+
+    if (**p == '{' || **p == '[') {
+        int nivel = 0;
+        do {
+            char c = **p;
+            if (c == '\0') {
+                return false; /* arquivo acabou antes de fechar */
+            }
+            if (c == '"') {
+                if (!pular_string(p)) {
+                    return false;
+                }
+                continue;
+            }
+            if (c == '{' || c == '[') {
+                nivel++;
+            } else if (c == '}' || c == ']') {
+                nivel--;
+            }
+            (*p)++;
+        } while (nivel > 0);
+        return true;
+    }
+
+    /* número, true, false ou null: vai até a vírgula ou o fechamento */
+    const char *inicio = *p;
+    while (**p && **p != ',' && **p != '}' && **p != ']' &&
+           !isspace((unsigned char)**p)) {
+        (*p)++;
+    }
+    return *p != inicio;
+}
+
+/* "λ" e "ε" (UTF-8) também são aceitos como lambda nas transições. */
+static bool eh_lambda_unicode(const char *s) {
+    return strcmp(s, "λ") == 0 || strcmp(s, "ε") == 0;
 }
 
 static bool chave_igual(const char *chave, const char *a, const char *b) {
@@ -132,11 +219,16 @@ static bool ler_transicao(const char **p, Transicao *t) {
     if (!consumir(p, ',')) {
         return false;
     }
-    if (!ler_string(p, simb, sizeof(simb)) || simb[0] == '\0' ||
-        simb[1] != '\0') {
+    if (!ler_string(p, simb, sizeof(simb))) {
         return false;
     }
-    t->simbolo = simb[0];
+    if (eh_lambda_unicode(simb)) {
+        t->simbolo = SIMBOLO_LAMBDA;
+    } else if (simb[0] != '\0' && simb[1] == '\0') {
+        t->simbolo = simb[0];
+    } else {
+        return false;
+    }
     return consumir(p, ']');
 }
 
@@ -172,6 +264,67 @@ static bool ler_array_transicoes(const char **p, Automato *af) {
     }
 }
 
+/* Remove nomes repetidos de uma lista, mantendo a primeira ocorrência. */
+static void remover_nomes_repetidos(char lista[][MAX_NOME], int *n) {
+    int unicos = 0;
+    for (int i = 0; i < *n; i++) {
+        bool repetido = false;
+        for (int j = 0; j < unicos; j++) {
+            if (strcmp(lista[j], lista[i]) == 0) {
+                repetido = true;
+            }
+        }
+        if (!repetido) {
+            strcpy(lista[unicos], lista[i]);
+            unicos++;
+        }
+    }
+    *n = unicos;
+}
+
+/*
+ * O JSON pode listar a mesma coisa duas vezes (um estado, um símbolo, uma
+ * transição). Isso não muda o autômato, então só removemos as repetições.
+ */
+static void remover_duplicatas(Automato *af) {
+    remover_nomes_repetidos(af->estados, &af->n_estados);
+    remover_nomes_repetidos(af->estados_finais, &af->n_finais);
+
+    int unicos = 0;
+    for (int i = 0; i < af->n_alfabeto; i++) {
+        bool repetido = false;
+        for (int j = 0; j < unicos; j++) {
+            if (af->alfabeto[j] == af->alfabeto[i]) {
+                repetido = true;
+            }
+        }
+        if (!repetido) {
+            af->alfabeto[unicos] = af->alfabeto[i];
+            unicos++;
+        }
+    }
+    af->n_alfabeto = unicos;
+
+    unicos = 0;
+    for (int i = 0; i < af->n_transicoes; i++) {
+        Transicao atual = af->transicoes[i];
+        bool repetida = false;
+        for (int j = 0; j < unicos; j++) {
+            Transicao anterior = af->transicoes[j];
+            if (anterior.simbolo == atual.simbolo &&
+                strcmp(anterior.origem, atual.origem) == 0 &&
+                strcmp(anterior.destino, atual.destino) == 0) {
+                repetida = true;
+            }
+        }
+        if (!repetida) {
+            af->transicoes[unicos] = atual;
+            unicos++;
+        }
+    }
+    af->n_transicoes = unicos;
+}
+
 static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
                                 char *erro, int erro_tam) {
     bool tem_alfabeto = false;
@@ -188,8 +341,8 @@ static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
 
     pular_espacos(p);
     if (**p == '}') {
-        (*p)++;
-        return true;
+        snprintf(erro, erro_tam, "%s: autômato vazio", ctx);
+        return false;
     }
 
     while (1) {
@@ -266,8 +419,12 @@ static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
                 return false;
             }
         } else {
-            snprintf(erro, erro_tam, "%s: campo desconhecido '%s'", ctx, chave);
-            return false;
+            /* Campo extra (ex.: "nome", "tipo"): ignora o valor. */
+            if (!pular_valor(p)) {
+                snprintf(erro, erro_tam, "%s: valor inválido no campo '%s'",
+                         ctx, chave);
+                return false;
+            }
         }
 
         pular_espacos(p);
@@ -277,11 +434,26 @@ static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
         }
         if (**p == '}') {
             (*p)++;
-            return true;
+            break;
         }
         snprintf(erro, erro_tam, "%s: JSON malformado no objeto", ctx);
         return false;
     }
+
+    /* estados-finais e transicoes podem faltar; os outros são obrigatórios */
+    if (!tem_alfabeto) {
+        snprintf(erro, erro_tam, "%s: campo 'alfabeto' ausente", ctx);
+        return false;
+    }
+    if (!tem_estados) {
+        snprintf(erro, erro_tam, "%s: campo 'estados' ausente", ctx);
+        return false;
+    }
+    if (!tem_inicial) {
+        snprintf(erro, erro_tam, "%s: campo 'estado-inicial' ausente", ctx);
+        return false;
+    }
+    return true;
 }
 
 static char *ler_arquivo_inteiro(const char *caminho, char *erro, int erro_tam) {
@@ -346,6 +518,11 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
     }
 
     const char *p = buf;
+    /* Pula BOM UTF-8 (arquivos salvos por alguns editores no Windows). */
+    if ((unsigned char)p[0] == 0xEF && (unsigned char)p[1] == 0xBB &&
+        (unsigned char)p[2] == 0xBF) {
+        p += 3;
+    }
     bool ok = false;
     bool tem_af1 = false;
     bool chave_af1 = false;
@@ -411,8 +588,11 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
             }
             *resultado_presente = true;
         } else {
-            snprintf(erro, erro_tam, "chave desconhecida '%s'", chave);
-            goto fim;
+            /* Chave extra na raiz: ignora o valor. */
+            if (!pular_valor(&p)) {
+                snprintf(erro, erro_tam, "JSON inválido no campo '%s'", chave);
+                goto fim;
+            }
         }
 
         pular_espacos(&p);
@@ -431,6 +611,14 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
     if (!tem_af1) {
         snprintf(erro, erro_tam, "JSON sem automato1");
         goto fim;
+    }
+
+    remover_duplicatas(af1);
+    if (*af2_presente) {
+        remover_duplicatas(af2);
+    }
+    if (resultado_presente != NULL && *resultado_presente) {
+        remover_duplicatas(af_resultado);
     }
 
     {

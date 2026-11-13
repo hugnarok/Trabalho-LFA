@@ -26,14 +26,18 @@ Dentro de cada autômato:
 | `estado-inicial` | `estado_inicial` | **string** |
 | `transicoes` | `transições` | `[[origem, destino, simbolo], ...]` |
 
-Símbolo λ: `"&"` na transição.
+Símbolo λ: `"&"` na transição (também aceita `"λ"` e `"ε"`).
+
+- `alfabeto`, `estados` e `estado-inicial` são **obrigatórios**; `estados-finais` e `transicoes` são opcionais.
+- Campos extras (ex.: `"nome"`, `"tipo"`) são **ignorados**, no autômato e na raiz.
 
 ## Fluxo de leitura
 
-1. `ler_arquivo_inteiro` — limite de **10 MiB**.
-2. Parser recursivo (caseiro): objetos, arrays, strings com escape.
+1. `ler_arquivo_inteiro` — limite de **10 MiB**; BOM UTF-8 no início é ignorado.
+2. Parser recursivo (caseiro): objetos, arrays, strings com escapes simples (`\"`, `\\`, `\/`, `\n`, `\t`, `\r`). `\uXXXX` não é suportado: escreva o caractere direto (ex.: `"λ"`).
 3. Chave duplicada no mesmo objeto → erro.
-4. `automato_validar` em cada bloco carregado.
+4. `remover_duplicatas`: símbolo, estado, estado final ou transição repetidos são mantidos uma vez só.
+5. `automato_validar` em cada bloco carregado.
 
 ## Funções públicas
 
