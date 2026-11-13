@@ -16,7 +16,7 @@ O autômato é um único tipo compartilhado (`lib/funcoes.h` inclui `automato.h`
 | `transicoes[]`, `n_transicoes` | Triplas origem, destino, símbolo |
 | `SIMBOLO_LAMBDA` (`'&'`) | Apenas nas transições, nunca no alfabeto |
 
-**Limites:** `MAX_ESTADOS` 128, `MAX_TRANSICOES` 1024, `MAX_ALFABETO` 32, `MAX_NOME` 64.
+**Limites:** `MAX_ESTADOS` 256, `MAX_TRANSICOES` 4096, `MAX_ALFABETO` 32, `MAX_NOME` 64.
 
 ## Funções públicas
 
