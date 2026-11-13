@@ -12,32 +12,34 @@
 
 ## Algoritmo
 
-### 1. Inalcançáveis
+O resultado é sempre o **AFD mínimo completo**: todo estado tem transição para todo símbolo. Quando a linguagem exige, aparece um estado de erro (poço) não final que leva todo símbolo para ele mesmo.
 
-BFS a partir do inicial; estados não alcançáveis são ignorados (`classe[i] = -1`).
+### 1. Completar o AFD
 
-### 2. Partição inicial
+Monta a tabela `delta[q][a]`. Transição ausente vai para um **poço implícito** (índice `n`), com `delta[poço][a] = poço`. Assim, transições ausentes e estados mortos explícitos ficam equivalentes, e o particionamento consegue juntá-los.
+
+### 2. Inalcançáveis
+
+BFS a partir do inicial sobre a tabela completa; estados não alcançáveis são ignorados (`classe[q] = -1`). O poço só entra no resultado se for alcançável.
+
+### 3. Partição inicial
 
 - Classe dos **finais** alcançáveis.
-- Classe dos **não finais** alcançáveis.
+- Classe dos **não finais** alcançáveis (inclui o poço).
 
-### 3. Refinamento
+### 4. Refinamento
 
-Repetir até estabilizar: estados na mesma classe permanecem juntos só se, para **cada** símbolo do alfabeto, os destinos caem na mesma classe (transição ausente conta como destino inválido).
+Repetir até o número de classes parar de crescer: estados na mesma classe permanecem juntos só se, para **cada** símbolo, os destinos caem na mesma classe.
 
-### 4. AFD mínimo
+### 5. AFD mínimo
 
-Um estado por classe; transições a partir do representante; final se a classe contém algum final original.
-
-## Auxiliar
-
-`destino_da_transicao` — primeira transição (origem, símbolo); `-1` se omitida (AFD parcial).
+Um estado por classe (`M0`, `M1`, …); transições a partir do representante; final se o representante é final.
 
 ## Uso
 
 - Opção **5** → **AF Resultado**.
-- Mesma linguagem antes e depois; menos estados quando há equivalentes.
+- Mesma linguagem antes e depois; número mínimo de estados para um AFD completo.
 
 ## Limites
 
-`MAX_TRANSICOES` na montagem; validação na saída.
+`MAX_ESTADOS` (o poço conta como estado) e `MAX_TRANSICOES` na montagem; validação na saída.
