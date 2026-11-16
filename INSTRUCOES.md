@@ -292,25 +292,25 @@ Cada integrante testa a própria função nesses arquivos antes de integrar.
 
 ## 10. Checklist de entrega (19/11)
 
-- [ ] Lê JSON com 1 ou 2 autômatos
-- [ ] Conversão AFN múltiplo-estado → AFN-λ
-- [ ] Conversão AFN-λ → AFN
-- [ ] Conversão AFN → AFD
-- [ ] Minimização de AFD
-- [ ] Teste de palavras no terminal e por arquivo
-- [ ] União, interseção e subtração (2 AFDs)
-- [ ] Complemento (1 AFD)
-- [ ] Exportação dos AFs
-- [ ] Exemplos + instrução de como rodar
-- [ ] Nomes dos 4 integrantes no README
+- [x] Lê JSON com 1 ou 2 autômatos
+- [x] Conversão AFN múltiplo-estado → AFN-λ
+- [x] Conversão AFN-λ → AFN
+- [x] Conversão AFN → AFD
+- [x] Minimização de AFD
+- [x] Teste de palavras no terminal e por arquivo
+- [x] União, interseção e subtração (2 AFDs)
+- [x] Complemento (1 AFD)
+- [x] Exportação dos AFs
+- [x] Exemplos + instrução de como rodar
+- [x] Nomes dos 4 integrantes no README
 
 ---
 
-## 11. Quem fica com o quê (preencher os nomes)
+## 11. Quem fica com o quê
 
 | Papel | Nome | Funções |
 |---|---|---|
-| Integrante 1 | ________________ | Base, JSON, menu, exportar (#10) |
-| Integrante 2 | ________________ | Conversões #1 #2 #3 |
-| Integrante 3 | ________________ | Minimizar #4 + teste #5 |
-| Integrante 4 | ________________ | União #6, interseção #7, subtração #8, complemento #9 |
+| Integrante 1 | Hugo Henrique Marques | Base, JSON, menu, exportar (#10) |
+| Integrante 2 | Ahmed Amer Hachem | Conversões #1 #2 #3 |
+| Integrante 3 | Deivy Rossi Teixeira de Melo | Minimizar #4 + teste #5 |
+| Integrante 4 | Arthur Batista Lage e Silva | União #6, interseção #7, subtração #8, complemento #9 |

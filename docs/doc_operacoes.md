@@ -1,3 +1,5 @@
+# Operações entre linguagens (AFDs)
+
 ## Changelog
 
 02/11/2026 ~ Arthur
@@ -6,7 +8,7 @@
 - Transfere operações do `src/funcoes_stubs.c` para `src/operacoes.c`
 - Cria `/docs` para armazenar explicações de codigo
 - Atualiza lista de integrantes no README.md
-- Cria 2 testes: `data/afd_parcial.json` e `data/afd_alfabetos_diferentes.json`
+- Cria 2 testes: `data/afd_parcial.json` e `data/afds_alfabetos_diferentes.json`
 
 ## Documentação das Operações
 

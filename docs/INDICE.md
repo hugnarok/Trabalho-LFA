@@ -1,6 +1,6 @@
 # Documentação do Trabalho LFA — Autômatos Finitos
 
-Documentação interna do código para estudo e entrega. Cada capítulo segue o mesmo estilo de `docs_operacoes.md`: conceitos, algoritmo, funções e ligação com o menu.
+Documentação interna do código para estudo e entrega. Cada capítulo segue o mesmo estilo de `doc_operacoes.md`: conceitos, algoritmo, funções e ligação com o menu.
 
 ## Equipe e responsáveis
 
@@ -9,7 +9,7 @@ Documentação interna do código para estudo e entrega. Cada capítulo segue o 
 | Hugo Henrique Marques | `main.c`, `json_io.c`, `automato.c`, menu e carga |
 | Ahmed Amer Hachem | `conversao.c` — opções 2, 3, 4 |
 | Deivy Rossi Teixeira de Melo | `minimizacao.c`, `teste.c` — opções 5, 6, 7 |
-| Arthur Batista Lage e Silva | `operacoes.c` — opções 8–11 (`docs_operacoes.md`) |
+| Arthur Batista Lage e Silva | `operacoes.c` — opções 8–11 (`doc_operacoes.md`) |
 
 ## Capítulos
 
@@ -20,7 +20,7 @@ Documentação interna do código para estudo e entrega. Cada capítulo segue o 
 | [doc_conversao.md](doc_conversao.md) | AFN multi→λ, λ→AFN, AFN→AFD |
 | [doc_minimizacao.md](doc_minimizacao.md) | Minimização de AFD |
 | [doc_teste.md](doc_teste.md) | Teste de palavras |
-| [docs_operacoes.md](docs_operacoes.md) | União, interseção, subtração, complemento |
+| [doc_operacoes.md](doc_operacoes.md) | União, interseção, subtração, complemento |
 | [doc_menu.md](doc_menu.md) | Menu, memória AF1/AF2/Resultado, fluxos |
 
 ## Mapa menu → código
@@ -57,7 +57,7 @@ Com [Pandoc](https://pandoc.org) instalado:
 ```bash
 cd docs
 pandoc INDICE.md doc_base.md doc_json_io.md doc_conversao.md doc_minimizacao.md \
-  doc_teste.md docs_operacoes.md doc_menu.md \
+  doc_teste.md doc_operacoes.md doc_menu.md \
   -o ~/Desktop/LFA-manual-estudo.pdf \
   --metadata title="Trabalho LFA — Manual do Código"
 ```
