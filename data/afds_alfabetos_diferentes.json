@@ -16,5 +16,13 @@
     "transicoes": [
       ["p0", "p1", "b"]
     ]
+  },"resultado": {
+    "alfabeto": ["c"],
+    "estados": ["r0", "r1"],
+    "estados-finais": ["r1"],
+    "estado-inicial": "r0",
+    "transicoes": [
+      ["r0", "r1", "c"]
+    ]
   }
 }

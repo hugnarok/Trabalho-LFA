@@ -56,13 +56,15 @@ bool testar_palavra(const Automato *af, const char *palavra, bool *aceita,
     }
 
     *aceita = false;
+    if (erro != NULL && erro_tam > 0) {
+        erro[0] = '\0';
+    }
 
     for (int i = 0; palavra[i] != '\0'; i++) {
         if (!simbolo_no_alfabeto(af, palavra[i])) {
-            snprintf(erro, erro_tam,
-                     "símbolo '%c' não pertence ao alfabeto do autômato",
-                     palavra[i]);
-            return false;
+            *aceita = false;
+            snprintf(erro, erro_tam, "contém símbolo fora do alfabeto");
+            return true;
         }
     }
 
@@ -87,6 +89,18 @@ bool testar_palavra(const Automato *af, const char *palavra, bool *aceita,
             }
         }
 
+        if (proximo < 0) {
+            *aceita = false;
+            if (erro != NULL && erro_tam > 0) {
+                erro[0] = '\0';
+            }
+            return true;
+        }
+
+        estado_atual = proximo;
+    }
+
+    *aceita = automato_eh_final(af, af->estados[estado_atual]);
         aplicar_fecho_lambda(af, proximos);
         memcpy(ativos, proximos, sizeof(ativos));
     }
