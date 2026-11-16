@@ -275,7 +275,9 @@ static void remover_nomes_repetidos(char lista[][MAX_NOME], int *n) {
             }
         }
         if (!repetido) {
-            strcpy(lista[unicos], lista[i]);
+            if (unicos != i) {
+                strcpy(lista[unicos], lista[i]);
+            }
             unicos++;
         }
     }

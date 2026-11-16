@@ -7,7 +7,7 @@
 ## Pré-requisitos
 
 - Autômato válido: **AFD, AFN ou AFN-λ** (não precisa determinizar antes).
-- Cada caractere da palavra pertence ao `alfabeto`; senão a função devolve **erro**. No menu, isso aparece como `palavra → REJEITA (símbolo 'x' fora do alfabeto)` e o teste continua.
+- Caractere fora do `alfabeto` → **REJEITA** no menu (`símbolo 'x' fora do alfabeto`); o teste continua. Em `testar_palavra`, `aceita = false` e `return true`.
 
 ## Algoritmo
 

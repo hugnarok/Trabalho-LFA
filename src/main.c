@@ -843,28 +843,6 @@ static void acao_copiar_slots(void) {
            nome_slot(origem));
 }
 
-static void imprimir_resultado_teste(const char *palavra, bool aceita,
-                                     const char *erro) {
-    const char *motivo = (erro != NULL && erro[0] != '\0') ? erro : NULL;
-    if (palavra[0] == '\0') {
-        if (aceita) {
-            printf("ε → ACEITA\n");
-        } else if (motivo != NULL) {
-            printf("ε → REJEITA (%s)\n", motivo);
-        } else {
-            printf("ε → REJEITA\n");
-        }
-        return;
-    }
-    if (aceita) {
-        printf("%s → ACEITA\n", palavra);
-    } else if (motivo != NULL) {
-        printf("%s → REJEITA (%s)\n", palavra, motivo);
-    } else {
-        printf("%s → REJEITA\n", palavra);
-    }
-}
-
 static void acao_testar_terminal(void) {
     const Automato *af = escolher_automato_unario();
     if (af == NULL) {
@@ -890,10 +868,6 @@ static void acao_testar_terminal(void) {
         if (!testar_e_imprimir(af, palavra)) {
             break;
         }
-<<<<<<< HEAD
-=======
-        imprimir_resultado_teste(palavra, aceita, erro);
->>>>>>> e61466a (fix: correcao no teste de palavras)
         printf("Palavra: ");
     }
 }

@@ -89,18 +89,6 @@ bool testar_palavra(const Automato *af, const char *palavra, bool *aceita,
             }
         }
 
-        if (proximo < 0) {
-            *aceita = false;
-            if (erro != NULL && erro_tam > 0) {
-                erro[0] = '\0';
-            }
-            return true;
-        }
-
-        estado_atual = proximo;
-    }
-
-    *aceita = automato_eh_final(af, af->estados[estado_atual]);
         aplicar_fecho_lambda(af, proximos);
         memcpy(ativos, proximos, sizeof(ativos));
     }
