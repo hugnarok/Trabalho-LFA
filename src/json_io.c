@@ -35,6 +35,11 @@ static bool ler_string(const char **p, char *out, int out_tam) {
     while (**p && **p != '"') {
         char c = **p;
 
+        /* Controle cru (tab, newline etc.) não é permitido em string JSON. */
+        if ((unsigned char)c < 0x20) {
+            return false;
+        }
+
         if (c == '\\') {
             (*p)++; /* pula a barra e olha o caractere seguinte */
             char escapado = **p;
@@ -67,10 +72,31 @@ static bool ler_string(const char **p, char *out, int out_tam) {
 
 /* Avança p até depois do fim da string que começa em p (aspas inclusas). */
 static bool pular_string(const char **p) {
+    if (**p != '"') {
+        return false;
+    }
     (*p)++; /* aspas de abertura */
     while (**p && **p != '"') {
-        if (**p == '\\' && (*p)[1] != '\0') {
-            (*p)++; /* pula o caractere escapado */
+        unsigned char c = (unsigned char)**p;
+        if (c < 0x20) {
+            return false; /* controle cru não é permitido */
+        }
+        if (c == '\\') {
+            (*p)++;
+            char escapado = **p;
+            if (escapado == '\0') {
+                return false;
+            }
+            if (escapado == 'u') {
+                for (int i = 0; i < 4; i++) {
+                    (*p)++;
+                    if (!isxdigit((unsigned char)**p)) {
+                        return false;
+                    }
+                }
+            } else if (strchr("\"\\/bfnrt", escapado) == NULL) {
+                return false; /* escape inválido */
+            }
         }
         (*p)++;
     }
@@ -81,48 +107,155 @@ static bool pular_string(const char **p) {
     return true;
 }
 
-/*
- * Pula um valor JSON qualquer. Usado para ignorar campos que o programa não
- * conhece (ex.: "nome", "tipo"). Para objetos e arrays, conta a abertura e o
- * fechamento de { [ ] } até voltar ao nível zero.
- */
-static bool pular_valor(const char **p) {
-    pular_espacos(p);
+/* Após um valor, só pode vir espaço, vírgula, ']' , '}' ou fim do arquivo. */
+static bool fim_de_valor(char c) {
+    return c == '\0' || c == ',' || c == '}' || c == ']' ||
+           isspace((unsigned char)c);
+}
 
-    if (**p == '"') {
+static bool pular_numero(const char **p) {
+    const char *s = *p;
+    if (*s == '-') {
+        s++;
+    }
+    if (*s == '0') {
+        s++;
+    } else if (*s >= '1' && *s <= '9') {
+        while (*s >= '0' && *s <= '9') {
+            s++;
+        }
+    } else {
+        return false;
+    }
+    if (*s == '.') {
+        s++;
+        if (!(*s >= '0' && *s <= '9')) {
+            return false;
+        }
+        while (*s >= '0' && *s <= '9') {
+            s++;
+        }
+    }
+    if (*s == 'e' || *s == 'E') {
+        s++;
+        if (*s == '+' || *s == '-') {
+            s++;
+        }
+        if (!(*s >= '0' && *s <= '9')) {
+            return false;
+        }
+        while (*s >= '0' && *s <= '9') {
+            s++;
+        }
+    }
+    if (!fim_de_valor(*s)) {
+        return false;
+    }
+    *p = s;
+    return true;
+}
+
+static bool pular_valor_rec(const char **p, int profundidade);
+
+/*
+ * Pula um valor JSON qualquer, validando a estrutura. Usado para ignorar
+ * campos que o programa não conhece (ex.: "nome", "tipo"), mas sem aceitar
+ * lixo como 'tru' ou colchetes/chaves desemparelhados.
+ */
+static bool pular_valor_rec(const char **p, int profundidade) {
+    if (profundidade > 64) {
+        return false; /* aninhamento excessivo */
+    }
+
+    pular_espacos(p);
+    char c = **p;
+
+    if (c == '"') {
         return pular_string(p);
     }
 
-    if (**p == '{' || **p == '[') {
-        int nivel = 0;
-        do {
-            char c = **p;
-            if (c == '\0') {
-                return false; /* arquivo acabou antes de fechar */
+    if (c == '{') {
+        (*p)++;
+        pular_espacos(p);
+        if (**p == '}') {
+            (*p)++;
+            return true;
+        }
+        while (1) {
+            pular_espacos(p);
+            if (**p != '"' || !pular_string(p)) {
+                return false;
             }
-            if (c == '"') {
-                if (!pular_string(p)) {
-                    return false;
-                }
+            if (!consumir(p, ':')) {
+                return false;
+            }
+            if (!pular_valor_rec(p, profundidade + 1)) {
+                return false;
+            }
+            pular_espacos(p);
+            if (**p == ',') {
+                (*p)++;
                 continue;
             }
-            if (c == '{' || c == '[') {
-                nivel++;
-            } else if (c == '}' || c == ']') {
-                nivel--;
+            if (**p == '}') {
+                (*p)++;
+                return true;
             }
-            (*p)++;
-        } while (nivel > 0);
-        return true;
+            return false;
+        }
     }
 
-    /* número, true, false ou null: vai até a vírgula ou o fechamento */
-    const char *inicio = *p;
-    while (**p && **p != ',' && **p != '}' && **p != ']' &&
-           !isspace((unsigned char)**p)) {
+    if (c == '[') {
         (*p)++;
+        pular_espacos(p);
+        if (**p == ']') {
+            (*p)++;
+            return true;
+        }
+        while (1) {
+            if (!pular_valor_rec(p, profundidade + 1)) {
+                return false;
+            }
+            pular_espacos(p);
+            if (**p == ',') {
+                (*p)++;
+                continue;
+            }
+            if (**p == ']') {
+                (*p)++;
+                return true;
+            }
+            return false;
+        }
     }
-    return *p != inicio;
+
+    if (c == 't') {
+        if (strncmp(*p, "true", 4) == 0 && fim_de_valor((*p)[4])) {
+            *p += 4;
+            return true;
+        }
+        return false;
+    }
+    if (c == 'f') {
+        if (strncmp(*p, "false", 5) == 0 && fim_de_valor((*p)[5])) {
+            *p += 5;
+            return true;
+        }
+        return false;
+    }
+    if (c == 'n') {
+        if (strncmp(*p, "null", 4) == 0 && fim_de_valor((*p)[4])) {
+            *p += 4;
+            return true;
+        }
+        return false;
+    }
+
+    return pular_numero(p);
+}
+
+static bool pular_valor(const char **p) {
+    return pular_valor_rec(p, 0);
 }
 
 /* "λ" e "ε" (UTF-8) também são aceitos como lambda nas transições. */
@@ -610,6 +743,14 @@ bool carregar_json(const char *caminho, Automato *af1, Automato *af2,
         goto fim;
     }
 
+    /* Depois do objeto raiz só pode haver espaços em branco. */
+    pular_espacos(&p);
+    if (*p != '\0') {
+        snprintf(erro, erro_tam,
+                 "JSON inválido: conteúdo extra após o objeto raiz");
+        goto fim;
+    }
+
     if (!tem_af1) {
         snprintf(erro, erro_tam, "JSON sem automato1");
         goto fim;
@@ -657,17 +798,45 @@ static void fprint_string_json(FILE *f, const char *s) {
     if (s != NULL) {
         for (const char *p = s; *p != '\0'; p++) {
             unsigned char c = (unsigned char)*p;
-            if (c == '"' || c == '\\') {
-                fputc('\\', f);
-                fputc((char)c, f);
-            } else if (c == '\n') {
+            switch (c) {
+            case '"':
+                fputs("\\\"", f);
+                break;
+            case '\\':
+                fputs("\\\\", f);
+                break;
+            case '\b':
+                fputs("\\b", f);
+                break;
+            case '\f':
+                fputs("\\f", f);
+                break;
+            case '\n':
                 fputs("\\n", f);
-            } else {
-                fputc((char)c, f);
+                break;
+            case '\r':
+                fputs("\\r", f);
+                break;
+            case '\t':
+                fputs("\\t", f);
+                break;
+            default:
+                if (c < 0x20 || c == 0x7F) {
+                    fprintf(f, "\\u%04X", (unsigned)c);
+                } else {
+                    fputc((char)c, f);
+                }
+                break;
             }
         }
     }
     fputc('"', f);
+}
+
+/* Escreve um símbolo de um caractere como string JSON (com escape correto). */
+static void fprint_simbolo_json(FILE *f, char simbolo) {
+    char s[2] = {simbolo, '\0'};
+    fprint_string_json(f, s);
 }
 
 static void escrever_af(FILE *f, const Automato *af, const char *nome,
@@ -679,8 +848,8 @@ static void escrever_af(FILE *f, const Automato *af, const char *nome,
 
     fprintf(f, "%*s\"alfabeto\": [", indent + 2, "");
     for (int i = 0; i < af->n_alfabeto; i++) {
-        fprintf(f, "\"%c\"%s", af->alfabeto[i],
-                i + 1 < af->n_alfabeto ? ", " : "");
+        fprint_simbolo_json(f, af->alfabeto[i]);
+        fputs(i + 1 < af->n_alfabeto ? ", " : "", f);
     }
     fprintf(f, "],\n");
 
@@ -713,16 +882,38 @@ static void escrever_af(FILE *f, const Automato *af, const char *nome,
         fprint_string_json(f, t->origem);
         fputs(", ", f);
         fprint_string_json(f, t->destino);
-        fprintf(f, ", \"%c\"]%s\n", t->simbolo,
-                i + 1 < af->n_transicoes ? "," : "");
+        fputs(", ", f);
+        fprint_simbolo_json(f, t->simbolo);
+        fprintf(f, "]%s\n", i + 1 < af->n_transicoes ? "," : "");
     }
     fprintf(f, "%*s]\n", indent + 2, "");
     fprintf(f, "%*s}", indent, "");
 }
 
+static bool validar_para_exportar(const Automato *af, const char *nome,
+                                  char *erro, int erro_tam) {
+    char msg[256];
+    if (!automato_validar(af, msg, sizeof(msg))) {
+        snprintf(erro, erro_tam, "%s: %s", nome, msg);
+        return false;
+    }
+    return true;
+}
+
 bool exportar_json(const Automato *af1, const Automato *af2, bool tem_af2,
                    const Automato *resultado, bool tem_resultado,
                    const char *caminho, char *erro, int erro_tam) {
+    if (!validar_para_exportar(af1, "automato1", erro, erro_tam)) {
+        return false;
+    }
+    if (tem_af2 && !validar_para_exportar(af2, "automato2", erro, erro_tam)) {
+        return false;
+    }
+    if (tem_resultado &&
+        !validar_para_exportar(resultado, "resultado", erro, erro_tam)) {
+        return false;
+    }
+
     FILE *f = fopen(caminho, "w");
     if (!f) {
         snprintf(erro, erro_tam, "não foi possível criar '%s'", caminho);
@@ -748,6 +939,10 @@ bool exportar_json(const Automato *af1, const Automato *af2, bool tem_af2,
 
 bool exportar_um_af(const Automato *af, const char *nome_campo,
                     const char *caminho, char *erro, int erro_tam) {
+    if (!validar_para_exportar(af, nome_campo, erro, erro_tam)) {
+        return false;
+    }
+
     FILE *f = fopen(caminho, "w");
     if (!f) {
         snprintf(erro, erro_tam, "não foi possível criar '%s'", caminho);

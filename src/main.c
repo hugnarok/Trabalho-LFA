@@ -55,6 +55,48 @@ static bool ler_linha(char *buf, int tam) {
     return true;
 }
 
+/*
+ * Lê uma linha de arquivo. Marca "longa" quando a linha não cabe no buffer:
+ * nesse caso o resto da linha é descartado e a linha deve ser ignorada.
+ */
+static bool ler_linha_arquivo(FILE *f, char *buf, int tam, bool *longa) {
+    *longa = false;
+    if (!fgets(buf, tam, f)) {
+        buf[0] = '\0';
+        return false;
+    }
+
+    size_t n = strlen(buf);
+    if (n == (size_t)(tam - 1) && buf[n - 1] != '\n') {
+        int c = fgetc(f);
+        /* O '\r' do CRLF pode ter ficado de fora quando a linha tem
+         * exatamente tam-1 caracteres. */
+        if (c == '\r') {
+            c = fgetc(f);
+        }
+        if (c == '\n' || c == EOF) {
+            /* A linha tem exatamente tam-1 caracteres: cabe no buffer. */
+        } else {
+            *longa = true;
+            while (c != '\n' && c != EOF) {
+                c = fgetc(f);
+            }
+        }
+    }
+
+    if (*longa) {
+        buf[0] = '\0';
+        return true;
+    }
+
+    n = strlen(buf);
+    if (n > 0 && buf[n - 1] == '\n') {
+        buf[n - 1] = '\0';
+    }
+    remover_cr(buf);
+    return true;
+}
+
 static bool palavra_vazia_especial(const char *s) {
     return strcmp(s, "ε") == 0 || strcmp(s, "<vazio>") == 0 ||
            strcmp(s, "<epsilon>") == 0 || strcmp(s, "<e>") == 0;
@@ -895,12 +937,28 @@ static void acao_testar_arquivo(void) {
 
     char linha[512];
     char palavra[512];
-    while (fgets(linha, sizeof(linha), f)) {
-        size_t n = strlen(linha);
-        if (n > 0 && linha[n - 1] == '\n') {
-            linha[n - 1] = '\0';
+    bool primeira_linha = true;
+    bool linha_longa = false;
+    int numero_linha = 0;
+    while (ler_linha_arquivo(f, linha, sizeof(linha), &linha_longa)) {
+        numero_linha++;
+
+        if (primeira_linha) {
+            primeira_linha = false;
+            /* Ignora BOM UTF-8 no início do arquivo. */
+            if (strlen(linha) >= 3 && (unsigned char)linha[0] == 0xEF &&
+                (unsigned char)linha[1] == 0xBB &&
+                (unsigned char)linha[2] == 0xBF) {
+                memmove(linha, linha + 3, strlen(linha + 3) + 1);
+            }
         }
-        remover_cr(linha);
+
+        if (linha_longa) {
+            printf("Aviso: linha %d ignorada (mais de %d caracteres).\n",
+                   numero_linha, (int)sizeof(linha) - 1);
+            continue;
+        }
+
         copiar_palavra_teste(linha, palavra, sizeof(palavra));
         if (!testar_e_imprimir(af, palavra)) {
             break;

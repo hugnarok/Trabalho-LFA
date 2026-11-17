@@ -152,6 +152,51 @@ static bool criar_estado(Automato *saida, const char *nome, bool final,
     return true;
 }
 
+/*
+ * Gera um nome que ainda não existe no autômato. Se "base" já estiver em uso,
+ * acrescenta sufixos _1, _2, ... (encurtando a base se necessário).
+ */
+static void gerar_nome_estado_unico(const Automato *af, const char *base,
+                                    char *destino, int tam) {
+    snprintf(destino, (size_t)tam, "%s", base);
+    if (automato_indice_estado(af, destino) < 0) {
+        return;
+    }
+
+    for (int sufixo = 1; sufixo < 1000000; sufixo++) {
+        char fim[16];
+        int n_fim = snprintf(fim, sizeof(fim), "_%d", sufixo);
+        int max_base = tam - 1 - n_fim;
+        if (max_base < 0) {
+            max_base = 0;
+        }
+        snprintf(destino, (size_t)tam, "%.*s%s", max_base, base, fim);
+        if (automato_indice_estado(af, destino) < 0) {
+            return;
+        }
+    }
+}
+
+/* Cria um estado com nome único e devolve o nome efetivamente usado. */
+static bool criar_estado_unico(Automato *saida, const char *nome, bool final,
+                               const char *operacao, char *erro, int erro_tam,
+                               char *nome_usado) {
+    if (saida->n_estados >= MAX_ESTADOS) {
+        snprintf(erro, erro_tam, "%s excede o limite de %d estados", operacao,
+                 MAX_ESTADOS);
+        return false;
+    }
+
+    gerar_nome_estado_unico(saida, nome, nome_usado, MAX_NOME);
+    strcpy(saida->estados[saida->n_estados], nome_usado);
+    if (final) {
+        strcpy(saida->estados_finais[saida->n_finais], nome_usado);
+        saida->n_finais++;
+    }
+    saida->n_estados++;
+    return true;
+}
+
 static bool montar_nome_par(const char *nome1, const char *nome2, char *destino,
                             const char *operacao, char *erro, int erro_tam) {
     int tam = snprintf(destino, MAX_NOME, "(%s,%s)", nome1, nome2);
@@ -224,6 +269,7 @@ static bool produto(const Automato *af1, const Automato *af2, TipoProduto tipo,
     saida->n_alfabeto = n_alfabeto;
 
     char nome[MAX_NOME];
+    char nome_usado[MAX_NOME];
     if (!montar_nome_par(af1->estados[inicial1], af2->estados[inicial2], nome,
                          operacao, erro, erro_tam)) {
         return false;
@@ -232,10 +278,11 @@ static bool produto(const Automato *af1, const Automato *af2, TipoProduto tipo,
     bool inicial_final =
         eh_final_produto(tipo, automato_eh_final(af1, af1->estados[inicial1]),
                          automato_eh_final(af2, af2->estados[inicial2]));
-    if (!criar_estado(saida, nome, inicial_final, operacao, erro, erro_tam)) {
+    if (!criar_estado_unico(saida, nome, inicial_final, operacao, erro,
+                            erro_tam, nome_usado)) {
         return false;
     }
-    strcpy(saida->estado_inicial, nome);
+    strcpy(saida->estado_inicial, nome_usado);
     mapa[inicial1][inicial2] = 0;
 
     int fila1[MAX_ESTADOS];
@@ -276,9 +323,9 @@ static bool produto(const Automato *af1, const Automato *af2, TipoProduto tipo,
                     automato_eh_final(af2, af2->estados[proximo_p]);
 
                 destino = saida->n_estados;
-                if (!criar_estado(saida, nome,
-                                  eh_final_produto(tipo, final1, final2),
-                                  operacao, erro, erro_tam)) {
+                if (!criar_estado_unico(saida, nome,
+                                        eh_final_produto(tipo, final1, final2),
+                                        operacao, erro, erro_tam, nome_usado)) {
                     return false;
                 }
                 mapa[proximo_q][proximo_p] = destino;
@@ -299,6 +346,10 @@ static bool produto(const Automato *af1, const Automato *af2, TipoProduto tipo,
             strcpy(tr->destino, saida->estados[destino]);
             tr->simbolo = alfabeto[a];
         }
+    }
+
+    if (!automato_validar(saida, erro, erro_tam)) {
+        return false;
     }
 
     return true;

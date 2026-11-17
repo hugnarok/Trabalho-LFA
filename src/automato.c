@@ -40,11 +40,12 @@ static bool nome_estado_valido(const char *nome, char *erro, int erro_tam) {
         return false;
     }
     for (const char *p = nome; *p != '\0'; p++) {
-        char c = *p;
-        if (c == '"' || c == '\\' || c == '\n' || c == '\r') {
+        unsigned char c = (unsigned char)*p;
+        if (c == '"' || c == '\\' || c < 0x20 || c == 0x7F) {
             snprintf(erro, erro_tam,
-                     "nome de estado '%s' contém caractere inválido '%c'",
-                     nome, c);
+                     "nome de estado '%s' contém caractere inválido "
+                     "(código %u)",
+                     nome, (unsigned)c);
             return false;
         }
     }
@@ -91,9 +92,16 @@ bool automato_validar(const Automato *af, char *erro, int erro_tam) {
     }
 
     for (int i = 0; i < af->n_alfabeto; i++) {
-        if (af->alfabeto[i] == SIMBOLO_LAMBDA) {
+        unsigned char simbolo = (unsigned char)af->alfabeto[i];
+        if (simbolo == (unsigned char)SIMBOLO_LAMBDA) {
             snprintf(erro, erro_tam,
                      "o caractere '&' não pode fazer parte do alfabeto");
+            return false;
+        }
+        if (simbolo < 0x20 || simbolo == 0x7F) {
+            snprintf(erro, erro_tam,
+                     "o alfabeto contém caractere de controle (código %u)",
+                     (unsigned)simbolo);
             return false;
         }
         for (int j = i + 1; j < af->n_alfabeto; j++) {
