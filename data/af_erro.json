@@ -1,5 +1,6 @@
 {
     "automato1": {
+      "descricao": "Exemplo de JSON com chaves incorretas (nao carrega)",
       "alfabeto": ["a", "b"],
       "estados": ["Q0", "Q1", "Q2"],
       "estados finais": ["Q2"],
@@ -13,6 +14,7 @@
     },
   
     "automato2": {
+      "descricao": "Segundo bloco com formato invalido (nao carrega)",
       "alfabeto": ["a", "b"],
       "estados": ["Q0", "Q1", "Q2"],
       "estados finais": ["Q2"],

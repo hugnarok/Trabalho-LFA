@@ -1,5 +1,6 @@
 {
   "automato1": {
+    "descricao": "AFN: dois destinos para o mesmo (estado, a)",
     "alfabeto": ["a", "b"],
     "estados": ["q0", "q1", "q2"],
     "estados-finais": ["q2"],

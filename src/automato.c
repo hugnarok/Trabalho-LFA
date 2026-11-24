@@ -7,6 +7,10 @@ void automato_init(Automato *af) {
     memset(af, 0, sizeof(Automato));
 }
 
+bool automato_tem_descricao(const Automato *af) {
+    return af != NULL && af->descricao[0] != '\0';
+}
+
 int automato_indice_estado(const Automato *af, const char *nome) {
     for (int i = 0; i < af->n_estados; i++) {
         if (strcmp(af->estados[i], nome) == 0) {

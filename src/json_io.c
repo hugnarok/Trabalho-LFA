@@ -467,6 +467,7 @@ static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
     bool tem_finais = false;
     bool tem_inicial = false;
     bool tem_transicoes = false;
+    bool tem_descricao = false;
 
     automato_init(af);
     if (!consumir(p, '{')) {
@@ -553,6 +554,17 @@ static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
                          MAX_TRANSICOES);
                 return false;
             }
+        } else if (chave_igual(chave, "descricao", "descrição")) {
+            if (tem_descricao) {
+                snprintf(erro, erro_tam, "%s: campo 'descricao' duplicado",
+                         ctx);
+                return false;
+            }
+            tem_descricao = true;
+            if (!ler_string(p, af->descricao, MAX_DESCRICAO)) {
+                snprintf(erro, erro_tam, "%s: 'descricao' inválida", ctx);
+                return false;
+            }
         } else {
             /* Campo extra (ex.: "nome", "tipo"): ignora o valor. */
             if (!pular_valor(p)) {
@@ -587,6 +599,10 @@ static bool ler_objeto_automato(const char **p, Automato *af, const char *ctx,
     if (!tem_inicial) {
         snprintf(erro, erro_tam, "%s: campo 'estado-inicial' ausente", ctx);
         return false;
+    }
+
+    if (strcmp(ctx, "resultado") == 0) {
+        af->descricao[0] = '\0';
     }
     return true;
 }
@@ -840,11 +856,17 @@ static void fprint_simbolo_json(FILE *f, char simbolo) {
 }
 
 static void escrever_af(FILE *f, const Automato *af, const char *nome,
-                        int indent) {
+                        int indent, bool incluir_descricao) {
     fprintf(f, "%*s", indent, "");
     fputc('"', f);
     fputs(nome, f);
     fputs("\": {\n", f);
+
+    if (incluir_descricao && af->descricao[0] != '\0') {
+        fprintf(f, "%*s\"descricao\": ", indent + 2, "");
+        fprint_string_json(f, af->descricao);
+        fputs(",\n", f);
+    }
 
     fprintf(f, "%*s\"alfabeto\": [", indent + 2, "");
     for (int i = 0; i < af->n_alfabeto; i++) {
@@ -921,15 +943,15 @@ bool exportar_json(const Automato *af1, const Automato *af2, bool tem_af2,
     }
 
     fprintf(f, "{\n");
-    escrever_af(f, af1, "automato1", 2);
+    escrever_af(f, af1, "automato1", 2, true);
 
     if (tem_af2) {
         fprintf(f, ",\n");
-        escrever_af(f, af2, "automato2", 2);
+        escrever_af(f, af2, "automato2", 2, true);
     }
     if (tem_resultado) {
         fprintf(f, ",\n");
-        escrever_af(f, resultado, "resultado", 2);
+        escrever_af(f, resultado, "resultado", 2, false);
     }
 
     fprintf(f, "\n}\n");
@@ -948,8 +970,10 @@ bool exportar_um_af(const Automato *af, const char *nome_campo,
         snprintf(erro, erro_tam, "não foi possível criar '%s'", caminho);
         return false;
     }
+    bool incluir_desc =
+        strcmp(nome_campo, "resultado") != 0;
     fprintf(f, "{\n");
-    escrever_af(f, af, nome_campo, 2);
+    escrever_af(f, af, nome_campo, 2, incluir_desc);
     fprintf(f, "\n}\n");
     fclose(f);
     return true;

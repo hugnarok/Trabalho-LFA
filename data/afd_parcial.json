@@ -1,5 +1,6 @@
 {
   "automato1": {
+    "descricao": "AFD parcial (falta transicao em alguns simbolos)",
     "alfabeto": ["a"],
     "estados": ["q0", "q1"],
     "estados-finais": ["q1"],

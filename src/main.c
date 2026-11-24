@@ -154,8 +154,8 @@ static void copiar_palavra_teste(const char *entrada, char *palavra, int tam) {
     snprintf(palavra, (size_t)tam, "%s", entrada);
 }
 
-static void resumo_automato(const Automato *af, bool carregado, char *buf,
-                            int tam) {
+static void resumo_automato(const Automato *af, bool carregado, bool com_descricao,
+                            char *buf, int tam) {
     if (!carregado || af->n_estados <= 0) {
         snprintf(buf, (size_t)tam, "vazio");
         return;
@@ -168,15 +168,20 @@ static void resumo_automato(const Automato *af, bool carregado, char *buf,
     } else {
         tipo = "AFN";
     }
-    snprintf(buf, (size_t)tam, "%s · %d est. · |Σ|=%d", tipo, af->n_estados,
-             af->n_alfabeto);
+    if (com_descricao && automato_tem_descricao(af)) {
+        snprintf(buf, (size_t)tam, "%s · %d est. · |Σ|=%d — %s", tipo,
+                 af->n_estados, af->n_alfabeto, af->descricao);
+    } else {
+        snprintf(buf, (size_t)tam, "%s · %d est. · |Σ|=%d", tipo, af->n_estados,
+                 af->n_alfabeto);
+    }
 }
 
 static void mostrar_menu(void) {
-    char r1[64], r2[64], r3[64];
-    resumo_automato(&af1, tem_af1, r1, (int)sizeof(r1));
-    resumo_automato(&af2, tem_af2, r2, (int)sizeof(r2));
-    resumo_automato(&af_resultado, tem_resultado, r3, (int)sizeof(r3));
+    char r1[320], r2[320], r3[320];
+    resumo_automato(&af1, tem_af1, true, r1, (int)sizeof(r1));
+    resumo_automato(&af2, tem_af2, true, r2, (int)sizeof(r2));
+    resumo_automato(&af_resultado, tem_resultado, false, r3, (int)sizeof(r3));
 
     printf("\n======== Trabalho LFA — Autômatos (C) ========\n");
     printf("  AF1:        %s\n", r1);
@@ -214,10 +219,10 @@ static const Automato *escolher_automato_unario(void) {
         return NULL;
     }
 
-    char r1[64], r2[64], r3[64];
-    resumo_automato(&af1, tem_af1, r1, (int)sizeof(r1));
-    resumo_automato(&af2, tem_af2, r2, (int)sizeof(r2));
-    resumo_automato(&af_resultado, tem_resultado, r3, (int)sizeof(r3));
+    char r1[320], r2[320], r3[320];
+    resumo_automato(&af1, tem_af1, true, r1, (int)sizeof(r1));
+    resumo_automato(&af2, tem_af2, true, r2, (int)sizeof(r2));
+    resumo_automato(&af_resultado, tem_resultado, false, r3, (int)sizeof(r3));
 
     printf("\nQual autômato usar na operação?\n");
     printf(" 1) AF1 — %s\n", r1);
@@ -665,6 +670,9 @@ static void acao_carregar(void) {
 
     printf("%s carregado (%s) de '%s'.\n", nome_slot, nome_bloco_json(bloco),
            caminho);
+    if (slot <= 2 && automato_tem_descricao(destino)) {
+        printf("  Descricao: %s\n", destino->descricao);
+    }
 }
 
 static void perguntar_copiar_resultado(void) {
@@ -893,8 +901,9 @@ static void acao_testar_terminal(void) {
     char entrada[512];
     char palavra[512];
 
-    char resumo[64];
-    resumo_automato(af, true, resumo, (int)sizeof(resumo));
+    char resumo[320];
+    bool com_descricao = af != &af_resultado;
+    resumo_automato(af, true, com_descricao, resumo, (int)sizeof(resumo));
     printf("Autômato: %s\n", resumo);
     printf("Alfabeto: {");
     for (int i = 0; i < af->n_alfabeto; i++) {
@@ -1042,10 +1051,16 @@ static void acao_exportar(void) {
 static void acao_mostrar(void) {
     if (tem_af1) {
         printf("\n--- AF1 ---\n");
+        if (automato_tem_descricao(&af1)) {
+            printf("  Descricao: %s\n", af1.descricao);
+        }
         automato_imprimir(&af1);
     }
     if (tem_af2) {
         printf("\n--- AF2 ---\n");
+        if (automato_tem_descricao(&af2)) {
+            printf("  Descricao: %s\n", af2.descricao);
+        }
         automato_imprimir(&af2);
     }
     if (tem_resultado) {

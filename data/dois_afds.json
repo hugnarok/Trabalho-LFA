@@ -1,5 +1,6 @@
 {
   "automato1": {
+    "descricao": "A par e B impar",
     "alfabeto": ["a", "b"],
     "estados": ["q0", "q1"],
     "estados-finais": ["q1"],
@@ -12,6 +13,7 @@
     ]
   },
   "automato2": {
+    "descricao": "Segundo AFD para uniao, intersecao e subtracao",
     "alfabeto": ["a", "b"],
     "estados": ["p0", "p1"],
     "estados-finais": ["p1"],

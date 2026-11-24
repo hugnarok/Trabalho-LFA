@@ -20,6 +20,7 @@ Dentro de cada autômato:
 
 | Chave | Alternativa | Tipo |
 |---|---|---|
+| `descricao` | `descrição` | string opcional — o que a linguagem aceita (só em `automato1` / `automato2`) |
 | `alfabeto` | — | `["a", "b"]` (um caractere por string) |
 | `estados` | — | array de strings |
 | `estados-finais` | `estados_finais` | array de strings |
@@ -29,6 +30,7 @@ Dentro de cada autômato:
 Símbolo λ: `"&"` na transição (também aceita `"λ"` e `"ε"`).
 
 - `alfabeto`, `estados` e `estado-inicial` são **obrigatórios**; `estados-finais` e `transicoes` são opcionais.
+- `descricao` aparece no menu e na opção 13 para AF1/AF2; **não** é exportada em `resultado` (saída de operação).
 - Campos extras (ex.: `"nome"`, `"tipo"`) são **ignorados**, no autômato e na raiz.
 
 ## Fluxo de leitura

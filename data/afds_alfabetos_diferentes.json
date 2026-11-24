@@ -1,5 +1,6 @@
 {
   "automato1": {
+    "descricao": "Linguagem sobre {a}",
     "alfabeto": ["a"],
     "estados": ["q0", "q1"],
     "estados-finais": ["q1"],
@@ -9,6 +10,7 @@
     ]
   },
   "automato2": {
+    "descricao": "Linguagem sobre {b}",
     "alfabeto": ["b"],
     "estados": ["p0", "p1"],
     "estados-finais": ["p1"],

@@ -1,5 +1,6 @@
 {
   "automato1": {
+    "descricao": "Teste invalido: transicao para estado inexistente",
     "alfabeto": ["a", "b"],
     "estados": ["q0", "q1"],
     "estados-finais": ["q1"],

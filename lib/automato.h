@@ -8,6 +8,7 @@
 #define MAX_ALFABETO 32
 #define MAX_TRANSICOES 4096
 #define SIMBOLO_LAMBDA '&'
+#define MAX_DESCRICAO 256
 
 typedef struct {
     char origem[MAX_NOME];
@@ -29,6 +30,8 @@ typedef struct {
 
     Transicao transicoes[MAX_TRANSICOES];
     int n_transicoes;
+
+    char descricao[MAX_DESCRICAO];
 } Automato;
 
 void automato_init(Automato *af);
@@ -38,5 +41,6 @@ int automato_indice_estado(const Automato *af, const char *nome);
 bool automato_eh_final(const Automato *af, const char *nome);
 bool automato_tem_lambda(const Automato *af);
 bool automato_eh_deterministico(const Automato *af);
+bool automato_tem_descricao(const Automato *af);
 
 #endif

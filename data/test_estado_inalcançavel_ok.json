@@ -1,5 +1,6 @@
 {
   "automato1": {
+    "descricao": "AFD com estado inalcançavel (lixo)",
     "alfabeto": ["0", "1"],
     "estados": ["q0", "q1", "lixo"],
     "estados-finais": ["q1"],
