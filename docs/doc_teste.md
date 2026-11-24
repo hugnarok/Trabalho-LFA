@@ -31,5 +31,6 @@ Para um AFD, o conjunto sempre tem um único estado, então é a simulação usu
 ## Menu — opção 7
 
 - Enter → `data/palavras.txt`.
+- Se o arquivo não abrir, pede outro caminho; Enter em branco volta ao menu.
 - Uma palavra por linha; linha vazia = ε.
 - Palavra com símbolo fora do alfabeto → `REJEITA` e segue para a próxima linha.

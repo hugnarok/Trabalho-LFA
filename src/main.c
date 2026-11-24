@@ -929,19 +929,31 @@ static void acao_testar_arquivo(void) {
         return;
     }
     char caminho[512];
-    printf("Arquivo de palavras [Enter = data/palavras.txt]: ");
-    if (!ler_linha(caminho, sizeof(caminho))) {
-        return;
-    }
-    if (caminho[0] == '\0') {
-        snprintf(caminho, sizeof(caminho), "data/palavras.txt");
-        printf("Usando %s\n", caminho);
-    }
+    FILE *f = NULL;
+    bool primeiro_caminho = true;
 
-    FILE *f = fopen(caminho, "r");
-    if (!f) {
-        printf("Não foi possível abrir '%s'.\n", caminho);
-        return;
+    while (f == NULL) {
+        if (primeiro_caminho) {
+            printf("Arquivo de palavras [Enter = data/palavras.txt]: ");
+        } else {
+            printf("Arquivo de palavras (Enter para voltar ao menu): ");
+        }
+        if (!ler_linha(caminho, sizeof(caminho))) {
+            return;
+        }
+        if (!primeiro_caminho && caminho[0] == '\0') {
+            return;
+        }
+        if (primeiro_caminho && caminho[0] == '\0') {
+            snprintf(caminho, sizeof(caminho), "data/palavras.txt");
+            printf("Usando %s\n", caminho);
+        }
+
+        f = fopen(caminho, "r");
+        if (f == NULL) {
+            printf("Não foi possível abrir '%s'.\n", caminho);
+            primeiro_caminho = false;
+        }
     }
 
     char linha[512];
